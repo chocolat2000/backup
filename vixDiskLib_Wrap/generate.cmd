@@ -1,0 +1,1 @@
+swig -csharp -dllimport "vixDiskLib_Wrap.dll" -namespace Backup.Services.VDDK vixDiskLib.i
