@@ -8,6 +8,7 @@ using BackupDatabase;
 using BackupDatabase.Models;
 using BackupWeb.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Configuration;
 
 namespace BackupWeb.Controllers
 {
@@ -25,16 +26,16 @@ namespace BackupWeb.Controllers
             this.agentClient = agentClient;
         }
 
-        private async Task<DBServer> GetServer(Guid id, ServerType type)
+        private async Task<DBServer> GetServer(Guid id, ServerType type, bool withcreds = false)
         {
             DBServer server = null;
             switch (type)
             {
                 case ServerType.Windows:
-                    server = await metaDB.GetWindowsServer(id);
+                    server = await metaDB.GetWindowsServer(id, withcreds);
                     break;
                 case ServerType.VMware:
-                    server = await metaDB.GetVMWareServer(id);
+                    server = await metaDB.GetVMWareServer(id, withcreds);
                     break;
             }
 
@@ -52,7 +53,15 @@ namespace BackupWeb.Controllers
         public async Task<IActionResult> GetServer(Guid id, bool refresh = false)
         {
             var servertype = await metaDB.GetServerType(id);
-            var server = await GetServer(id, servertype);
+            DBServer server = null;
+            try
+            {
+                server = await GetServer(id, servertype, refresh);
+            }
+            catch(Exception)
+            {
+                //Todo: some logging ...
+            }
             if (server == null) return NotFound();
             if (refresh)
             {
@@ -89,15 +98,25 @@ namespace BackupWeb.Controllers
         }
 
         [HttpPost("Windows")]
+        [Authorize(Roles = "admin")]
         public async Task<IActionResult> AddWindowsServer([FromBody] DBWindowsServer server)
         {
             return new ObjectResult(await metaDB.AddServer(server));
         }
 
         [HttpPost("VMware")]
+        [Authorize(Roles = "admin")]
         public async Task<IActionResult> AddVMwareServer([FromBody] DBVMwareServer server)
         {
             return new ObjectResult(await metaDB.AddServer(server));
+        }
+
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "admin")]
+        public async Task<IActionResult> Delete(Guid id)
+        {
+            await metaDB.DeleteServer(id);
+            return new NoContentResult();
         }
 
         [HttpPost("{id}/BackupNow")]

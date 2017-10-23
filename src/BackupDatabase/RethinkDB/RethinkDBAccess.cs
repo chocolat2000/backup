@@ -131,6 +131,13 @@ namespace BackupDatabase.RethinkDB
 
         }
 
+        public async Task DeleteServer(Guid server)
+        {
+            var Q = TblServers.Get(server).Delete();
+
+            await Q.RunResultAsync(Conn);
+        }
+
         public async Task<ServerType> GetServerType(Guid id)
         {
 
@@ -148,28 +155,28 @@ namespace BackupDatabase.RethinkDB
 
         }
 
-        public async Task<DBWindowsServer> GetWindowsServer(Guid id)
+        public async Task<DBWindowsServer> GetWindowsServer(Guid id, bool withcreds = false)
         {
             var Q = TblServers.Get(id);
 
             return await Q.RunAtomAsync<DBWindowsServer>(Conn);
         }
 
-        public DBWindowsServer GetWindowsServerSync(Guid id)
+        public DBWindowsServer GetWindowsServerSync(Guid id, bool withcreds = false)
         {
             var Q = TblServers.Get(id);
 
             return Q.RunAtom<DBWindowsServer>(Conn);
         }
 
-        public async Task<DBVMwareServer> GetVMWareServer(Guid id)
+        public async Task<DBVMwareServer> GetVMWareServer(Guid id, bool withcreds = false)
         {
             var Q = TblServers.Get(id);
 
             return await Q.RunAtomAsync<DBVMwareServer>(Conn);
         }
 
-        public DBVMwareServer GetVMWareServerSync(Guid id)
+        public DBVMwareServer GetVMWareServerSync(Guid id, bool withcreds = false)
         {
             var Q = TblServers.Get(id);
 

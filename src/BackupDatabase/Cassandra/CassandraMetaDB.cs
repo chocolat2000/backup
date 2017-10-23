@@ -6,12 +6,25 @@ using BackupDatabase.Models;
 using Cassandra;
 using Cassandra.Data.Linq;
 using Cassandra.Mapping;
+using Crypto;
 
 namespace BackupDatabase.Cassandra
 {
     public class CassandraMetaDB : IMetaDBAccess
     {
         private Cluster casCluster;
+        private Encrypt encrypt;
+
+        private byte[] passwordsKey;
+        public byte[] PasswordsKey
+        {
+            get { return passwordsKey; }
+            set
+            {
+                passwordsKey = value;
+                encrypt = new Encrypt(value);
+            }
+        }
 
         private ISession conn;
         private ISession Conn
@@ -28,32 +41,167 @@ namespace BackupDatabase.Cassandra
             }
         }
 
-        private Table<DBWindowsServer> TblWindowsServer => new Table<DBWindowsServer>(Conn);
-        private Table<DBVMwareServer> TblVMwareServer => new Table<DBVMwareServer>(Conn);
-        private Table<DBServer> TblServers => new Table<DBServer>(Conn);
-        private Table<DBBackup> TblBackups => new Table<DBBackup>(Conn);
-        private Table<DBFile> TblFiles => new Table<DBFile>(Conn);
-        private Table<DBFolder> TblFolder => new Table<DBFolder>(Conn);
-        private Table<DBFileBlock> TblFileBlocks => new Table<DBFileBlock>(Conn);
-        private Table<DBVMwareVM> TblVMwareVM => new Table<DBVMwareVM>(Conn);
-        private Table<DBVMDisk> TblVMDisks => new Table<DBVMDisk>(Conn);
-        private Table<DBVMDiskBlock> TblVMDiskBlocks => new Table<DBVMDiskBlock>(Conn);
-        private Table<DBCalendarEntry> TblCalendarEntry => new Table<DBCalendarEntry>(Conn);
+        private Table<DBWindowsServer> tblWindowsServer;
+        private Table<DBWindowsServer> TblWindowsServer
+        {
+            get
+            {
+                if (tblWindowsServer == null)
+                {
+                    tblWindowsServer = new Table<DBWindowsServer>(Conn);
+                    TblVMwareServer.CreateIfNotExists();
+                }
+                return tblWindowsServer;
+            }
+        }
+
+        private Table<DBVMwareServer> tblVMwareServer = null;
+        private Table<DBVMwareServer> TblVMwareServer
+        {
+            get
+            {
+                if(tblVMwareServer == null)
+                {
+                    tblVMwareServer = new Table<DBVMwareServer>(Conn);
+                    tblVMwareServer.CreateIfNotExists();
+                }
+                return tblVMwareServer;
+            }
+        }
+
+        private Table<DBServer> tTblServers = null;
+        private Table<DBServer> TblServers
+        {
+            get
+            {
+                if (tTblServers == null)
+                {
+                    tTblServers = new Table<DBServer>(Conn);
+                    TblVMwareServer.CreateIfNotExists();
+                }
+                return tTblServers;
+            }
+        }
+
+        private Table<DBBackup> tblBackups = null;
+        private Table<DBBackup> TblBackups
+        {
+            get
+            {
+                if (tblBackups == null)
+                {
+                    tblBackups = new Table<DBBackup>(Conn);
+                    tblBackups.CreateIfNotExists();
+                }
+                return tblBackups;
+            }
+        }
+
+        private Table<DBFile> tblFiles = null;
+        private Table<DBFile> TblFiles
+        {
+            get
+            {
+                if (tblFiles == null)
+                {
+                    tblFiles = new Table<DBFile>(Conn);
+                    tblFiles.CreateIfNotExists();
+                }
+                return tblFiles;
+            }
+        }
+
+        private Table<DBFolder> tblFolder = null;
+        private Table<DBFolder> TblFolder
+        {
+            get
+            {
+                if (tblFolder == null)
+                {
+                    tblFolder = new Table<DBFolder>(Conn);
+                    tblFolder.CreateIfNotExists();
+                }
+                return tblFolder;
+            }
+        }
+
+        private Table<DBFileBlock> tblFileBlocks = null;
+        private Table<DBFileBlock> TblFileBlocks
+        {
+            get
+            {
+                if (tblFileBlocks == null)
+                {
+                    tblFileBlocks = new Table<DBFileBlock>(Conn);
+                    tblFileBlocks.CreateIfNotExists();
+                }
+                return tblFileBlocks;
+            }
+        }
+
+        private Table<DBVMwareVM> tblVMwareVM = null;
+        private Table<DBVMwareVM> TblVMwareVM
+        {
+            get
+            {
+                if (tblVMwareVM == null)
+                {
+                    tblVMwareVM = new Table<DBVMwareVM>(Conn);
+                    tblVMwareVM.CreateIfNotExists();
+                }
+                return tblVMwareVM;
+            }
+        }
+
+        private Table<DBVMDisk> tblVMDisks = null;
+        private Table<DBVMDisk> TblVMDisks
+        {
+            get
+            {
+                if (tblVMDisks == null)
+                {
+                    tblVMDisks = new Table<DBVMDisk>(Conn);
+                    tblVMDisks.CreateIfNotExists();
+                }
+                return tblVMDisks;
+            }
+        }
+
+        private Table<DBVMDiskBlock> tblVMDiskBlocks = null;
+        private Table<DBVMDiskBlock> TblVMDiskBlocks
+        {
+            get
+            {
+                if (tblVMDiskBlocks == null)
+                {
+                    tblVMDiskBlocks = new Table<DBVMDiskBlock>(Conn);
+                    tblVMDiskBlocks.CreateIfNotExists();
+                }
+                return tblVMDiskBlocks;
+            }
+        }
+
+
+        private Table<DBCalendarEntry> tblCalendarEntry = null;
+        private Table<DBCalendarEntry> TblCalendarEntry
+        {
+            get
+            {
+                if (tblCalendarEntry == null)
+                {
+                    tblCalendarEntry = new Table<DBCalendarEntry>(Conn);
+                    tblCalendarEntry.CreateIfNotExists();
+                }
+                return tblCalendarEntry;
+            }
+        }
+
 
 
         public CassandraMetaDB(params string[] addresses)
         {
+            PasswordsKey = null;
             casCluster = Cluster.Builder().AddContactPoints(addresses).Build();
-            //TblWindowsServer.CreateIfNotExists();
-            TblVMwareServer.CreateIfNotExists();
-            TblBackups.CreateIfNotExists();
-            TblFiles.CreateIfNotExists();
-            TblFolder.CreateIfNotExists();
-            TblFileBlocks.CreateIfNotExists();
-            TblVMwareVM.CreateIfNotExists();
-            TblVMDisks.CreateIfNotExists();
-            TblVMDiskBlocks.CreateIfNotExists();
-            TblCalendarEntry.CreateIfNotExists();
         }
 
 
@@ -111,24 +259,6 @@ namespace BackupDatabase.Cassandra
             }
             await TblFolder.Insert(folder, false).ExecuteAsync().ConfigureAwait(false);
             return folder.Id;
-        }
-
-        public async Task<Guid> AddServer(DBServer server)
-        {
-            if (server.Id == Guid.Empty)
-            {
-                server.Id = Guid.NewGuid();
-            }
-            if (server is DBVMwareServer)
-            {
-                await TblVMwareServer.Insert((DBVMwareServer)server, false).ExecuteAsync().ConfigureAwait(false);
-            }
-            else if (server is DBWindowsServer)
-            {
-                await TblWindowsServer.Insert((DBWindowsServer)server, false).ExecuteAsync().ConfigureAwait(false);
-            }
-
-            return server.Id;
         }
 
         public async Task<Guid> AddVMDisk(DBVMDisk disk)
@@ -293,40 +423,135 @@ namespace BackupDatabase.Cassandra
             return await TblVMDiskBlocks.Where(b => b.VMDisk == vmDiskId).ExecuteAsync().ConfigureAwait(false);
         }
 
-        public async Task<DBVMwareServer> GetVMWareServer(Guid id)
+        public async Task<Guid> AddServer(DBServer server)
         {
-            return await TblVMwareServer
-                .Where(s => s.Id == id)
-                // Don't extract credentials from DB !
-                .Select(server => new DBVMwareServer { Id = server.Id, Name = server.Name, Ip = server.Ip, Port = server.Port, Type = server.Type, VMs = server.VMs })
-                .FirstOrDefault().ExecuteAsync().ConfigureAwait(false);
+            if (server.Id == Guid.Empty)
+            {
+                server.Id = Guid.NewGuid();
+            }
+            if (server is DBVMwareServer vmwareServer)
+            {
+                if (!string.IsNullOrWhiteSpace(vmwareServer.Password) && encrypt != null)
+                {
+                    vmwareServer.Password = await encrypt.Enrypt(vmwareServer.Password);
+                }
+                await TblVMwareServer.Insert(vmwareServer, false).ExecuteAsync().ConfigureAwait(false);
+            }
+            else if (server is DBWindowsServer windowsServer)
+            {
+                if (!string.IsNullOrWhiteSpace(windowsServer.Password) && encrypt != null)
+                {
+                    windowsServer.Password = await encrypt.Enrypt(windowsServer.Password);
+                }
+                await TblWindowsServer.Insert(windowsServer, false).ExecuteAsync().ConfigureAwait(false);
+            }
+
+            return server.Id;
         }
 
-        public DBVMwareServer GetVMWareServerSync(Guid id)
+        public async Task DeleteServer(Guid server)
         {
-            return TblVMwareServer
-                .Where(s => s.Id == id)
-                // Don't extract credentials from DB !
-                .Select(server => new DBVMwareServer { Id = server.Id, Name = server.Name, Ip = server.Ip, Port = server.Port, Type = server.Type, VMs = server.VMs })
-                .FirstOrDefault().Execute();
+            await TblWindowsServer.Where(s => s.Id == server).Delete().ExecuteAsync().ConfigureAwait(false);
         }
 
-        public async Task<DBWindowsServer> GetWindowsServer(Guid id)
+        public async Task<DBVMwareServer> GetVMWareServer(Guid id, bool withcreds = false)
         {
-            return await TblWindowsServer
-                .Where(s => s.Id == id)
+            var dbReq = TblVMwareServer.Where(s => s.Id == id);
+            if(!withcreds)
+            {
                 // Don't extract credentials from DB !
-                .Select(server => new DBWindowsServer { Id = server.Id, Name = server.Name, Ip = server.Ip, Port = server.Port, Type = server.Type })
-                .FirstOrDefault().ExecuteAsync().ConfigureAwait(false);
+                dbReq = dbReq.Select(s => new DBVMwareServer { Id = s.Id, Name = s.Name, Ip = s.Ip, Port = s.Port, Type = s.Type, VMs = s.VMs });
+            }
+            var server = await dbReq.FirstOrDefault().ExecuteAsync().ConfigureAwait(false);
+            if (withcreds)
+            {
+                if (PasswordsKey == null)
+                    throw new ArgumentNullException(nameof(PasswordsKey));
+
+                if (string.IsNullOrWhiteSpace(server.Password))
+                    throw new MissingMemberException("Password in DB is empry", nameof(server.Password));
+
+                server.Password = await encrypt.Decrypt(server.Password);
+
+            }
+
+            return server;
         }
 
-        public DBWindowsServer GetWindowsServerSync(Guid id)
+        public DBVMwareServer GetVMWareServerSync(Guid id, bool withcreds = false)
         {
-            return TblWindowsServer
-                .Where(s => s.Id == id)
+            var dbReq = TblVMwareServer.Where(s => s.Id == id);
+            if (!withcreds)
+            {
                 // Don't extract credentials from DB !
-                .Select(server => new DBWindowsServer { Id = server.Id, Name = server.Name, Ip = server.Ip, Port = server.Port, Type = server.Type })
-                .FirstOrDefault().Execute();
+                dbReq = dbReq.Select(s => new DBVMwareServer { Id = s.Id, Name = s.Name, Ip = s.Ip, Port = s.Port, Type = s.Type, VMs = s.VMs });
+            }
+            var server = dbReq.FirstOrDefault().Execute();
+            if (withcreds)
+            {
+                if (PasswordsKey == null)
+                    throw new ArgumentNullException(nameof(PasswordsKey));
+
+                if (string.IsNullOrWhiteSpace(server.Password))
+                    throw new MissingMemberException("Password in DB is empry", nameof(server.Password));
+
+                server.Password = encrypt.DecryptSync(server.Password);
+
+            }
+
+            return server;
+        }
+
+        public async Task<DBWindowsServer> GetWindowsServer(Guid id, bool withcreds = false)
+        {
+            var dbReq = TblWindowsServer.Where(s => s.Id == id);
+            if (!withcreds)
+            {
+                // Don't extract credentials from DB !
+                dbReq = dbReq.Select(s => new DBWindowsServer { Id = s.Id, Name = s.Name, Ip = s.Ip, Port = s.Port, Type = s.Type });
+
+            }
+            var server = await dbReq.FirstOrDefault().ExecuteAsync().ConfigureAwait(false);
+            if (withcreds)
+            {
+                if (PasswordsKey == null)
+                    throw new ArgumentNullException(nameof(PasswordsKey));
+
+                if (string.IsNullOrWhiteSpace(server.Password))
+                    throw new MissingMemberException("Password in DB is empry", nameof(server.Password));
+
+                server.Password = await encrypt.Decrypt(server.Password);
+
+            }
+
+            return server;
+
+        }
+
+        public DBWindowsServer GetWindowsServerSync(Guid id, bool withcreds = false)
+        {
+            var dbReq = TblWindowsServer.Where(s => s.Id == id);
+            if (!withcreds)
+            {
+                // Don't extract credentials from DB !
+                dbReq = dbReq.Select(s => new DBWindowsServer { Id = s.Id, Name = s.Name, Ip = s.Ip, Port = s.Port, Type = s.Type });
+
+            }
+            var server = dbReq.FirstOrDefault().Execute();
+            if (withcreds)
+            {
+                if (PasswordsKey == null)
+                    throw new ArgumentNullException(nameof(PasswordsKey));
+
+                if (string.IsNullOrWhiteSpace(server.Password))
+                    throw new MissingMemberException("Password in DB is empry", nameof(server.Password));
+
+                server.Password = encrypt.DecryptSync(server.Password);
+
+            }
+
+            return server;
+
         }
 
         public async Task<IEnumerable<DBServer>> GetServers()
@@ -367,6 +592,8 @@ namespace BackupDatabase.Cassandra
                     if (conn != null)
                     {
                         conn.Dispose();
+                        if (encrypt != null)
+                            encrypt.Dispose();
                     }
                 }
 

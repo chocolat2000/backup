@@ -29,7 +29,7 @@ namespace BackupWeb
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            var signingKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(Configuration["Tokens:Key"]));
+            var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Configuration["Tokens:Key"]));
 
             var tokenValidationParameters = new TokenValidationParameters
             {
@@ -44,7 +44,7 @@ namespace BackupWeb
                 ValidAudience = Configuration.GetSection("TokenProviderOptions:Audience").Value,
                 */
                 ValidIssuer = Configuration["Tokens:Issuer"],
-                ValidAudience = Configuration["Tokens:Issuer"],
+                ValidAudience = Configuration["Tokens:Audience"],
                 ValidateLifetime = true,
                 ClockSkew = TimeSpan.Zero
             };
@@ -61,9 +61,15 @@ namespace BackupWeb
                 options.SaveToken = true;
             });
 
+            var cassandraMetaDB = new CassandraMetaDB("127.0.0.1")
+            {
+                PasswordsKey = Encoding.UTF8.GetBytes(Configuration["Encryption:PasswordsKey"])
+            };
+            var cassandraUsersDB = new CassandraUsersDB("127.0.0.1");
+
             services.AddMvc();
-            services.AddSingleton<IMetaDBAccess>(new CassandraMetaDB("127.0.0.1"));
-            services.AddSingleton<IUsersDBAccess>(new CassandraUsersDB("127.0.0.1"));
+            services.AddSingleton<IMetaDBAccess>(cassandraMetaDB);
+            services.AddSingleton<IUsersDBAccess>(cassandraUsersDB);
             services.AddSingleton<AgentClient>();
         }
 

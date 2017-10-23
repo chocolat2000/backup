@@ -10,36 +10,44 @@ namespace BackupDatabase.Cassandra
     public class CassandraHashesDB : IDBHashes
     {
         private Cluster CasCluster;
-        private PreparedStatement insertStatement;
-        private PreparedStatement selectStatement;
+        private PreparedStatement InsertStatement => Session.Prepare("INSERT INTO hashes (hash, block) VALUES (?, ?)");
+        private PreparedStatement SelectStatement => Session.Prepare("SELECT block FROM hashes WHERE hash=?");
 
-        private ISession session;
+        private ISession session = null;
+        private ISession Session
+        {
+            get
+            {
+                if(session == null || session.IsDisposed)
+                {
+                    session = CasCluster.Connect();
+                    session.CreateKeyspaceIfNotExists("backup");
+                    session.ChangeKeyspace("backup");
+                    session.Execute(
+                        "CREATE TABLE IF NOT EXISTS hashes (" +
+                        "hash uuid," +
+                        "block uuid," +
+                        "PRIMARY KEY (hash, block)" +
+                        ")");
+
+                }
+                return session;
+            }
+        }
 
         public CassandraHashesDB(params string[] addresses)
         {
             CasCluster = Cluster.Builder().AddContactPoints(addresses).Build();
-            session = CasCluster.Connect();
-            session.CreateKeyspaceIfNotExists("backup");
-            session.ChangeKeyspace("backup");
-            session.Execute(
-                "CREATE TABLE IF NOT EXISTS hashes (" +
-                "hash uuid," +
-                "block uuid," +
-                "PRIMARY KEY (hash, block)" +
-                ");");
-
-            insertStatement = session.Prepare("INSERT INTO hashes (hash, block) VALUES (?, ?)");
-            selectStatement = session.Prepare("SELECT block FROM hashes WHERE hash=?");
         }
 
         public async Task AddHash(Guid hash, Guid block)
         {
-            await session.ExecuteAsync(insertStatement.Bind(hash, block)).ConfigureAwait(false);
+            await Session.ExecuteAsync(InsertStatement.Bind(hash, block)).ConfigureAwait(false);
         }
 
         public async Task<IEnumerable<Guid>> GetBlocksFromHash(Guid hash)
         {
-            var rowSet = await session.ExecuteAsync(selectStatement.Bind(hash)).ConfigureAwait(false);
+            var rowSet = await Session.ExecuteAsync(SelectStatement.Bind(hash)).ConfigureAwait(false);
             return rowSet.Select(row => row.GetValue<Guid>("block"));
         }
 

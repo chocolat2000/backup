@@ -30,12 +30,23 @@ namespace BackupDatabase.Cassandra
             }
         }
 
-        private Table<DBUser> TblUsers => new Table<DBUser>(Conn);
+        private Table<DBUser> tblUsers = null;
+        private Table<DBUser> TblUsers
+        {
+            get
+            {
+                if (tblUsers == null)
+                {
+                    tblUsers = new Table<DBUser>(Conn);
+                    tblUsers.CreateIfNotExists();
+                }
+                return tblUsers;
+            }
+        }
 
         public CassandraUsersDB(params string[] addresses)
         {
             casCluster = Cluster.Builder().AddContactPoints(addresses).Build();
-            TblUsers.CreateIfNotExists();
         }
 
         public async Task<DBUser> GetUser(string login, string password)

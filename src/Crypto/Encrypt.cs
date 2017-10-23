@@ -19,72 +19,82 @@ namespace Crypto
             this.key = key;
         }
 
+        public string EnryptSync(string message)
+        {
+            byte[] encrypted;
+            byte[] IV;
+
+            using (var aesAlg = Aes.Create())
+            {
+                IV = new byte[aesAlg.BlockSize / 8];
+                Rng.GetBytes(IV);
+                aesAlg.IV = IV;
+                aesAlg.Key = key;
+                aesAlg.Mode = ENCRYPT_CIPHERMODE;
+
+                using (var msEncrypt = new MemoryStream())
+                {
+                    using (var csEncrypt = new CryptoStream(msEncrypt, aesAlg.CreateEncryptor(), CryptoStreamMode.Write))
+                    {
+                        using (var swEncrypt = new StreamWriter(csEncrypt, Encoding.UTF8))
+                        {
+                            swEncrypt.Write(message);
+                        }
+                        encrypted = msEncrypt.ToArray();
+                    }
+                }
+
+            }
+
+            return $"{Convert.ToBase64String(IV)}{ENCRYPT_SPLIT}{Convert.ToBase64String(encrypted)}";
+
+        }
 
         public Task<string> Enrypt(string message)
         {
             return Task.Run(() =>
                     {
-                        byte[] encrypted;
-                        byte[] IV;
-
-                        using (var aesAlg = Aes.Create())
-                        {
-                            IV = new byte[aesAlg.BlockSize / 8];
-                            Rng.GetBytes(IV);
-                            aesAlg.IV = IV;
-                            aesAlg.Key = key;
-                            aesAlg.Mode = ENCRYPT_CIPHERMODE;
-
-                            using (var msEncrypt = new MemoryStream())
-                            {
-                                using (var csEncrypt = new CryptoStream(msEncrypt, aesAlg.CreateEncryptor(), CryptoStreamMode.Write))
-                                {
-                                    using (var swEncrypt = new StreamWriter(csEncrypt, Encoding.UTF8))
-                                    {
-                                        swEncrypt.Write(message);
-                                    }
-                                    encrypted = msEncrypt.ToArray();
-                                }
-                            }
-
-                        }
-
-                        return $"{Convert.ToBase64String(IV)}{ENCRYPT_SPLIT}{Convert.ToBase64String(encrypted)}";
+                        return EnryptSync(message);
                     });
+        }
+
+        public string DecryptSync(string message)
+        {
+            var messageSplited = message.Split(ENCRYPT_SPLIT);
+            if (messageSplited.Length != 2)
+                throw new ArgumentException("Encoded message format not recognised", nameof(message));
+
+            var IV = Convert.FromBase64String(messageSplited[0]);
+            var encrypted = Convert.FromBase64String(messageSplited[1]);
+
+            string decrypted;
+
+            using (var aesAlg = Aes.Create())
+            {
+                aesAlg.Key = key;
+                aesAlg.IV = IV;
+                aesAlg.Mode = ENCRYPT_CIPHERMODE;
+                using (var msDecrypt = new MemoryStream(encrypted))
+                {
+                    using (var csDecrypt = new CryptoStream(msDecrypt, aesAlg.CreateDecryptor(), CryptoStreamMode.Read))
+                    {
+                        using (var srDecrypt = new StreamReader(csDecrypt, Encoding.UTF8))
+                        {
+                            decrypted = srDecrypt.ReadToEnd();
+                        }
+                    }
+                }
+
+            }
+
+            return decrypted;
         }
 
         public Task<string> Decrypt(string message)
         {
             return Task.Run(() =>
             {
-                var messageSplited = message.Split(ENCRYPT_SPLIT);
-                if (messageSplited.Length != 2)
-                    return null;
-
-                var IV = Convert.FromBase64String(messageSplited[0]);
-                var encrypted = Convert.FromBase64String(messageSplited[1]);
-
-                string decrypted;
-
-                using (var aesAlg = Aes.Create())
-                {
-                    aesAlg.Key = key;
-                    aesAlg.IV = IV;
-                    aesAlg.Mode = ENCRYPT_CIPHERMODE;
-                    using (var msDecrypt = new MemoryStream(encrypted))
-                    {
-                        using (var csDecrypt = new CryptoStream(msDecrypt, aesAlg.CreateDecryptor(), CryptoStreamMode.Read))
-                        {
-                            using (var srDecrypt = new StreamReader(csDecrypt, Encoding.UTF8))
-                            {
-                                decrypted = srDecrypt.ReadToEnd();
-                            }
-                        }
-                    }
-
-                }
-
-                return decrypted;
+                return DecryptSync(message);
             });
         }
 

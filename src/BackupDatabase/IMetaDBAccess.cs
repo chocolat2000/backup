@@ -15,13 +15,13 @@ namespace BackupDatabase
 
         Task<ServerType> GetServerType(Guid id);
 
-        Task<DBWindowsServer> GetWindowsServer(Guid id);
+        Task<DBWindowsServer> GetWindowsServer(Guid id, bool withcreds = false);
 
-        DBWindowsServer GetWindowsServerSync(Guid id);
+        DBWindowsServer GetWindowsServerSync(Guid id, bool withcreds = false);
 
-        Task<DBVMwareServer> GetVMWareServer(Guid id);
+        Task<DBVMwareServer> GetVMWareServer(Guid id, bool withcreds = false);
 
-        DBVMwareServer GetVMWareServerSync(Guid id);
+        DBVMwareServer GetVMWareServerSync(Guid id, bool withcreds = false);
 
         Task<Guid> AddBackup(DBBackup backup);
 
@@ -82,6 +82,8 @@ namespace BackupDatabase
         Task<IEnumerable<DBFolder>> GetFolders(Guid backup, string pre = "");
 
         Task<Guid> AddServer(DBServer server);
+
+        Task DeleteServer(Guid server);
 
         Task<Guid> AddCalendarEntry(DBCalendarEntry entry);
 

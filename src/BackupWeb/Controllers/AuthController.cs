@@ -60,7 +60,7 @@ namespace BackupWeb.Controllers
             var expires = DateTime.UtcNow.AddMinutes(30);
             var token = new JwtSecurityToken(
                 configuration["Tokens:Issuer"],
-                configuration["Tokens:Issuer"],
+                configuration["Tokens:Audience"],
                 claims,
                 expires: expires,
                 signingCredentials: creds);

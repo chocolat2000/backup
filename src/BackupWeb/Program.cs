@@ -18,9 +18,11 @@ namespace BackupWeb
         }
 
         public static IWebHost BuildWebHost(string[] args) =>
-            WebHost.CreateDefaultBuilder(args)
-                .UseKestrel()
-                .UseStartup<Startup>()
-                .Build();
+            WebHost
+            .CreateDefaultBuilder(args)
+            .UseKestrel()
+            .UseStartup<Startup>()
+            .UseUrls(@"http://localhost:52834/")
+            .Build();
     }
 }
