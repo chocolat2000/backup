@@ -1,11 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.Extensions.Configuration;
@@ -52,7 +48,7 @@ namespace BackupWeb.Controllers
         private dynamic CreateToken(DBUser user)
         {
             var claims = new[]
-{
+            {
               new Claim(JwtRegisteredClaimNames.Sub, user.Login),
               new Claim("roles", user.Roles == null ? "" : string.Join(',', user.Roles))
             };
@@ -83,6 +79,20 @@ namespace BackupWeb.Controllers
                 return Unauthorized();
             }
 
+            return Ok(CreateToken(user));
+        }
+
+        [HttpGet("refresh")]
+        public async Task<IActionResult> Refresh()
+        {
+            var subClaim = User.Claims.Where(c => c.Type == ClaimTypes.NameIdentifier).FirstOrDefault();
+            var userLogin = subClaim?.Value;
+            if(string.IsNullOrWhiteSpace(userLogin))
+            {
+                return BadRequest(new LoginError { Reason = "Request not well formated" });
+            }
+
+            var user = await usersDB.GetUser(userLogin);
             return Ok(CreateToken(user));
         }
 

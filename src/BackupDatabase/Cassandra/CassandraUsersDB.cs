@@ -49,8 +49,13 @@ namespace BackupDatabase.Cassandra
             casCluster = Cluster.Builder().AddContactPoints(addresses).Build();
         }
 
-        public async Task<DBUser> GetUser(string login, string password)
+        public async Task<DBUser> GetUser(string login, string password = null)
         {
+            if(string.IsNullOrWhiteSpace(password))
+            {
+                return await TblUsers.Where(u => u.Login == login).Select(u => new DBUser { Login = u.Login, Roles = u.Roles }).FirstOrDefault().ExecuteAsync().ConfigureAwait(false);
+            }
+
             var user = await TblUsers.Where(u => u.Login == login).FirstOrDefault().ExecuteAsync().ConfigureAwait(false);
             if (user == null)
                 return null;

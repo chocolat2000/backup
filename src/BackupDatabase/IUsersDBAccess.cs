@@ -8,7 +8,7 @@ namespace BackupDatabase
 {
     public interface IUsersDBAccess : IDisposable
     {
-        Task<DBUser> GetUser(string login, string password);
+        Task<DBUser> GetUser(string login, string password = null);
 
         Task AddUser(string login, string password, IEnumerable<string> roles = null);
     }
