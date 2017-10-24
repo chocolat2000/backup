@@ -31,7 +31,7 @@ Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "dotnet", "..\..\..\..\..\..
 		AttachLaunchAction = No
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BackupWeb", "src\BackupWeb\BackupWeb.csproj", "{AF98E30D-B495-4401-9247-A816778D8274}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BackupWeb", "src\BackupWebAPI\BackupWebAPI.csproj", "{AF98E30D-B495-4401-9247-A816778D8274}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Vim25Proxy", "src\Vim25Proxy\Vim25Proxy.csproj", "{D934D84D-01FD-4DA3-85A6-47F45665B9E2}"
 EndProject

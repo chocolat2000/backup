@@ -1,0 +1,7 @@
+.table.is-log td:first-child {
+    white-space: nowrap;
+}
+
+.table.is-log th:last-child {
+    width: 100%;
+}
