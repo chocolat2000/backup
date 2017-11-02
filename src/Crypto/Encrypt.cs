@@ -10,13 +10,13 @@ namespace Crypto
     public class Encrypt : IDisposable
     {
         private const char ENCRYPT_SPLIT = '$';
-        private const CipherMode ENCRYPT_CIPHERMODE = CipherMode.CTS;
+        private static readonly SHA256 sha256 = new SHA256Managed();
         private static readonly RandomNumberGenerator Rng = RandomNumberGenerator.Create();
         private readonly byte[] key;
 
         public Encrypt(byte[] key)
         {
-            this.key = key;
+            this.key = sha256.ComputeHash(key);
         }
 
         public string EnryptSync(string message)
@@ -30,7 +30,6 @@ namespace Crypto
                 Rng.GetBytes(IV);
                 aesAlg.IV = IV;
                 aesAlg.Key = key;
-                aesAlg.Mode = ENCRYPT_CIPHERMODE;
 
                 using (var msEncrypt = new MemoryStream())
                 {
@@ -73,7 +72,7 @@ namespace Crypto
             {
                 aesAlg.Key = key;
                 aesAlg.IV = IV;
-                aesAlg.Mode = ENCRYPT_CIPHERMODE;
+
                 using (var msDecrypt = new MemoryStream(encrypted))
                 {
                     using (var csDecrypt = new CryptoStream(msDecrypt, aesAlg.CreateDecryptor(), CryptoStreamMode.Read))

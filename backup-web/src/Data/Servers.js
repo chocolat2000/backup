@@ -1,4 +1,4 @@
-import { GET, POST, DELETE } from './requester';
+import { GET, POST, PUT, DELETE } from './requester';
 import { loadData } from './withData';
 
 const allServers = () => {
@@ -13,20 +13,20 @@ const serverDetails = (serverId, refresh) => {
 };
 
 const getDrives = serverId => {
-  return GET(`/api/servers/drives/${serverId}`);
+  return GET(`/api/servers/${serverId}/drives`);
 };
 
 const getContent = (serverId, path) => {
   const uriPath = encodeURIComponent(path);
-  return GET(`/api/servers/content/${serverId}?folder=${uriPath}`);
-};
-
-const backupNow = (serverId, items) => {
-  return POST(`/api/servers/${serverId}/backupnow`, items);
+  return GET(`/api/servers/${serverId}/content?folder=${uriPath}`);
 };
 
 const addServer = server => {
   return POST(`/api/servers/${server.type}`, server);
+};
+
+const updateServer = server => {
+  return PUT(`/api/servers/${server.id}`, server);
 };
 
 const deleteServer = serverId => {
@@ -42,7 +42,7 @@ export {
   serverDetails,
   getDrives,
   getContent,
-  backupNow,
   addServer,
+  updateServer,
   deleteServer
 };

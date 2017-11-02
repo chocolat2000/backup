@@ -37,14 +37,16 @@ namespace Backup
         {
             if (ctsource.IsCancellationRequested)
                 return;
-            Console.WriteLine();
-            Console.WriteLine("-------------------");
-            Console.WriteLine();
+
             try
             {
                 var tasks = ((await database.GetNextEntries()).Select(calEntry =>
                 {
+                    Console.WriteLine();
+                    Console.WriteLine("-------------------");
+                    Console.WriteLine();
                     Console.WriteLine(calEntry.NextRun + " - " + calEntry.Id);
+
                     calEntry.UpdateNextRun();
                     return Task.Run(async () =>
                     {

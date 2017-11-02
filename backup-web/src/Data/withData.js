@@ -17,7 +17,7 @@ const addListener = function({ dataKey, setLoading, setData, setError }) {
   };
 };
 
-const loadData = (dataKey, p) => {
+const loadData = function(dataKey, p) {
   const listeners = registredDatasource[dataKey] || {};
   Object.keys(listeners).forEach(listenerId => {
     const { setLoading } = listeners[listenerId];

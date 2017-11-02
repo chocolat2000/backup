@@ -1,5 +1,4 @@
-﻿using Backup.Services;
-using BackupDatabase;
+﻿using BackupDatabase;
 using BackupNetworkLibrary.Model;
 using System;
 using System.Collections.Generic;
@@ -7,12 +6,13 @@ using System.Linq;
 using System.Net;
 using System.ServiceModel;
 using System.Threading.Tasks;
+using AgentProxy;
 
 namespace BackupWeb.Services
 {
     public class AgentClient
     {
-        private readonly IDictionary<Guid, ChannelFactory<IGeneralService>> windowsGeneralConnections = new Dictionary<Guid, ChannelFactory<IGeneralService>>();
+        private readonly IDictionary<Guid, WindowsProxy> windowsProxies = new Dictionary<Guid, WindowsProxy>();
         private readonly IMetaDBAccess metaDB;
 
         public AgentClient(IMetaDBAccess metaDB)
@@ -20,44 +20,29 @@ namespace BackupWeb.Services
             this.metaDB = metaDB;
         }
 
-        private IGeneralService GetGeneralService(Guid id)
+        private WindowsProxy GetWindowsProxy(Guid id)
         {
-            ChannelFactory<IGeneralService> backupFactory;
-            lock (windowsGeneralConnections)
+            WindowsProxy proxy;
+            lock (windowsProxies)
             {
-                if (!windowsGeneralConnections.TryGetValue(id, out backupFactory) || (backupFactory.State != CommunicationState.Opened))
+                if (!windowsProxies.TryGetValue(id, out proxy))
                 {
-                    var server = metaDB.GetWindowsServerSync(id);
+                    var server = metaDB.GetWindowsServerSync(id, true);
                     if (server == null) return null;
-                    var backupTcpBinding = new NetTcpBinding
-                    {
-                        MaxReceivedMessageSize = int.MaxValue,
-                    };
-                    backupTcpBinding.Security.Mode = SecurityMode.Transport;
-                    backupTcpBinding.Security.Transport.ClientCredentialType = TcpClientCredentialType.Windows;
-                    backupFactory = new ChannelFactory<IGeneralService>(backupTcpBinding, new EndpointAddress($"net.tcp://{server.Ip}:8733/General/"));
-                    backupFactory.Credentials.Windows.ClientCredential = new NetworkCredential(server.Username, server.Password);
-
-                    backupFactory.Faulted += BackupFactory_Faulted;
-
-                    windowsGeneralConnections.TryAdd(id, backupFactory);
+                    proxy = new WindowsProxy(server.Ip, server.Username, server.Password);
+                    windowsProxies.Add(id, proxy);
                 }
             }
 
-            return backupFactory.CreateChannel();
-        }
-
-        private void BackupFactory_Faulted(object sender, EventArgs e)
-        {
-            //??
+            return proxy;
         }
 
         public async Task<string[]> GetDrives(Guid id)
         {
-            var serverProxy = GetGeneralService(id);
+            var proxy = GetWindowsProxy(id);
             try
             {
-                return await serverProxy.GetDrivesAsync();
+                return await proxy.GetDrives();
             }
             catch(Exception e)
             {
@@ -67,10 +52,10 @@ namespace BackupWeb.Services
 
         public async Task<FolderContent> GetContent(Guid id, string folder)
         {
-            var serverProxy = GetGeneralService(id);
+            var proxy = GetWindowsProxy(id);
             try
             {
-                return await serverProxy.GetContentAsync(folder);
+                return await proxy.GetContent(folder);
             }
             catch(Exception e)
             {

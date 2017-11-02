@@ -10,6 +10,8 @@ using System.Security.Claims;
 using System.Text;
 using BackupDatabase;
 using BackupDatabase.Models;
+using System.ComponentModel.DataAnnotations;
+using Newtonsoft.Json;
 
 namespace BackupWeb.Controllers
 {
@@ -27,12 +29,18 @@ namespace BackupWeb.Controllers
 
         public class UserLogin
         {
+            [JsonProperty("login")]
+            [Required]
             public string Login { get; set; }
+
+            [JsonProperty("password")]
+            [Required]
             public string Password { get; set; }
         }
 
         public class LoginError
         {
+            [JsonProperty("reason")]
             public string Reason { get; set; }
         }
 

@@ -8,7 +8,8 @@ using BackupDatabase;
 using BackupDatabase.Models;
 using BackupWeb.Services;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.Extensions.Configuration;
+using BackupWebAPI.Filters;
+using Newtonsoft.Json.Linq;
 
 namespace BackupWeb.Controllers
 {
@@ -45,12 +46,11 @@ namespace BackupWeb.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var x = HttpContext.User.Claims;
-            return new ObjectResult(await metaDB.GetServers());
+            return Ok(await metaDB.GetServers());
         }
 
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetServer(Guid id, bool refresh = false)
+        [HttpGet("{id:Guid}")]
+        public async Task<IActionResult> Get(Guid id, bool refresh = false)
         {
             var servertype = await metaDB.GetServerType(id);
             DBServer server = null;
@@ -81,57 +81,81 @@ namespace BackupWeb.Controllers
                 }
             }
 
-            return new ObjectResult(server);
+            return Ok(server);
         }
 
-        [HttpGet("Drives/{id}")]
-        public async Task<IActionResult> GetDrives(Guid id)
-        {
-            return new ObjectResult(await agentClient.GetDrives(id));
-
-        }
-
-        [HttpGet("Content/{id}")]
-        public async Task<IActionResult> GetContent(Guid id, string folder)
-        {
-            return new ObjectResult(await agentClient.GetContent(id, folder));
-        }
-
-        [HttpPost("Windows")]
-        [Authorize(Roles = "admin")]
-        public async Task<IActionResult> AddWindowsServer([FromBody] DBWindowsServer server)
-        {
-            return new ObjectResult(await metaDB.AddServer(server));
-        }
-
-        [HttpPost("VMware")]
-        [Authorize(Roles = "admin")]
-        public async Task<IActionResult> AddVMwareServer([FromBody] DBVMwareServer server)
-        {
-            return new ObjectResult(await metaDB.AddServer(server));
-        }
-
-        [HttpDelete("{id}")]
+        [HttpDelete("{id:Guid}")]
         [Authorize(Roles = "admin")]
         public async Task<IActionResult> Delete(Guid id)
         {
             await metaDB.DeleteServer(id);
-            return new NoContentResult();
+            return NoContent();
         }
 
-        [HttpPost("{id}/BackupNow")]
-        public async Task<IActionResult> BackupNow(Guid id, [FromBody] string[] items)
+        [HttpGet("{id:Guid}/drives")]
+        public async Task<IActionResult> GetDrives(Guid id)
         {
-            if (items == null || items.Length == 0)
+            return Ok(await agentClient.GetDrives(id));
+
+        }
+
+        [HttpGet("{id:Guid}/content")]
+        public async Task<IActionResult> GetContent(Guid id, string folder)
+        {
+            return Ok(await agentClient.GetContent(id, folder));
+        }
+
+        [HttpPost("windows")]
+        [Authorize(Roles = "admin")]
+        [ValidateModel]
+        public async Task<IActionResult> AddWindowsServer([FromBody] DBWindowsServer server)
+        {
+            return Ok(await metaDB.AddServer(server));
+        }
+
+        [HttpPost("vmware")]
+        [Authorize(Roles = "admin")]
+        [ValidateModel]
+        public async Task<IActionResult> AddVMwareServer([FromBody] DBVMwareServer server)
+        {
+            return Ok(await metaDB.AddServer(server));
+        }
+
+        [HttpPut("{id:Guid}")]
+        [Authorize(Roles = "admin")]
+        [ValidateModel]
+        public async Task<IActionResult> UpdateServer(Guid id, [FromBody] JToken server)
+        {
+            DBServer dBServer;
+            switch(await metaDB.GetServerType(id))
             {
-                return BadRequest();
+                case ServerType.Windows:
+                    {
+                        dBServer = server.ToObject<DBWindowsServer>();
+                    }
+                    break;
+                case ServerType.VMware:
+                    {
+                        dBServer = server.ToObject<DBVMwareServer>();
+                    }
+                    break;
+                case ServerType.Undefined:
+                default:
+                    {
+                        dBServer = null;
+                    }
+                    break;
             }
 
-            var now = DateTime.UtcNow;
-
-            await metaDB.AddCalendarEntry(new DBCalendarEntry { FirstRun = now, NextRun = now, Items = items, Periodicity = Periodicity.None, Enabled= true, Server = id });
-
-            return new NoContentResult();
+            if(dBServer == null)
+            {
+                return NotFound();
+            }
+            else
+            {
+                await metaDB.UpdateServer(dBServer);
+            }
+            return Ok();
         }
 
     }

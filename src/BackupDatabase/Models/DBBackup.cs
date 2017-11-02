@@ -13,17 +13,17 @@ namespace BackupDatabase.Models
     {
         [JsonProperty("id", DefaultValueHandling = DefaultValueHandling.Ignore)]
         [Column("id")]
-        [PartitionKey]
+        [SecondaryIndex]
         public Guid Id { get; set; }
 
         [JsonProperty("server")]
         [Column("server")]
-        [SecondaryIndex]
+        [PartitionKey]
         public Guid Server { get; set; }
 
         [JsonProperty("startdate")]
         [Column("startdate")]
-        [ClusteringKey(ClusteringSortOrder = SortOrder.Descending)]
+        [ClusteringKey]
         public DateTime StartDate { get; set; }
 
         [JsonProperty("enddate")]
@@ -53,6 +53,7 @@ namespace BackupDatabase.Models
         Running,
         Failed,
         Warning,
-        Successful
+        Successful,
+        Cancelled
     }
 }

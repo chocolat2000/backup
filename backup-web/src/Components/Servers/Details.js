@@ -1,24 +1,24 @@
 import React, { Component } from 'react';
 import { withData } from '../../Data/withData';
-import { serverDetails } from '../../Data/Servers';
-import { allBackups } from '../../Data/Backups';
+import { serverDetails, updateServer } from '../../Data/Servers';
+import { allBackups, cancel } from '../../Data/Backups';
 
 import { formVMware, formWindows } from './Forms';
 
 import './Details.css';
 
-const renderForm = server => {
+const renderForm = function(server, options) {
   switch (server.type) {
     case 'Windows':
-      return formWindows(server, { withBackupNow: true });
+      return formWindows(server, options);
     case 'VMware':
-      return formVMware(server, { withBackupNow: true });
+      return formVMware(server, options);
     default:
       return <h3>Unknown server type</h3>;
   }
 };
 
-const shortString = val => {
+const shortString = function(val) {
   if (val.length < 40) return val;
   return `${val.substr(0, 37)}...`;
 };
@@ -27,9 +27,25 @@ class Details extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      expandedlogs: {}
+      expandedlogs: {},
+      form: {}
     };
   }
+
+  onChange = ({ target: { value, name } }) => {
+    this.setState(({ form }) => {
+      form[name] = value;
+      return { form };
+    });
+  };
+
+  handleSubmit = event => {
+    event.preventDefault();
+
+    const { form } = this.state;
+    const { data: { server } } = this.props;
+    updateServer(Object.assign({}, server, form));
+  };
 
   toggleLog = logId => () => {
     this.setState(({ expandedlogs }) => {
@@ -41,6 +57,13 @@ class Details extends Component {
   render() {
     const { data: { isLoading, server, backups } } = this.props;
     const { expandedlogs } = this.state;
+
+    const formOptions = {
+      withBackupNow: true,
+      onChange: this.onChange,
+      onSubmit: this.handleSubmit
+    };
+
     if (isLoading || !server) {
       return (
         <section className="section">
@@ -60,7 +83,9 @@ class Details extends Component {
                   {name} - {type}
                 </div>
               </div>
-              <div className="card-content">{renderForm(server)}</div>
+              <div className="card-content">
+                {renderForm(server, formOptions)}
+              </div>
             </div>
           </div>
           <div className="container" style={{ marginTop: '1.2rem' }}>
@@ -80,7 +105,22 @@ class Details extends Component {
                     const oneRow = [
                       <tr key={id}>
                         <td>{startdate}</td>
-                        <td>{status}</td>
+                        <td>
+                          {status === 'Running' ? (
+                            <a
+                              onClick={() => {
+                                cancel(id);
+                              }}
+                            >
+                              <span>{status}</span>
+                              <span>
+                                <i className="fa fa-stop-circle" />
+                              </span>
+                            </a>
+                          ) : (
+                            status
+                          )}
+                        </td>
                         <td>
                           <button
                             className="button is-white is-small"

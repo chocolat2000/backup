@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Runtime.Serialization;
 
+/*
 namespace System.Runtime.Serialization
 {
     public class ExtensionDataObject
@@ -14,9 +15,28 @@ namespace System.Runtime.Serialization
     {
     }
 }
+*/
 
-namespace Backup.Services
+namespace AgentProxy
 {
+    [System.CodeDom.Compiler.GeneratedCodeAttribute("System.ServiceModel", "4.0.0.0")]
+    [System.ServiceModel.ServiceContractAttribute(ConfigurationName = "IGeneralService")]
+    public interface IGeneralService
+    {
+
+        [System.ServiceModel.OperationContractAttribute(Name = "GetDrives")]
+        string[] GetDrives();
+
+        [System.ServiceModel.OperationContractAttribute(Name = "GetDrives")]
+        System.Threading.Tasks.Task<string[]> GetDrivesAsync();
+
+        [System.ServiceModel.OperationContractAttribute(Name = "GetContent")]
+        BackupNetworkLibrary.Model.FolderContent GetContent(string folder);
+
+        [System.ServiceModel.OperationContractAttribute(Name = "GetContent")]
+        System.Threading.Tasks.Task<BackupNetworkLibrary.Model.FolderContent> GetContentAsync(string folder);
+    }
+
     [System.CodeDom.Compiler.GeneratedCodeAttribute("System.ServiceModel", "4.0.0.0")]
     [System.ServiceModel.ServiceContractAttribute(ConfigurationName = "IBackupService", CallbackContract = typeof(IBackupServiceCallback))]
     public interface IBackupService

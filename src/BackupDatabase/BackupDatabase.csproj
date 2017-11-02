@@ -12,6 +12,7 @@
   <ItemGroup>
     <PackageReference Include="CassandraCSharpDriver" Version="3.3.2" />
     <PackageReference Include="RethinkDb.Driver" Version="2.3.20" />
+    <PackageReference Include="System.ComponentModel.Annotations" Version="4.4.0" />
   </ItemGroup>
 
   <ItemGroup>

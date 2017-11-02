@@ -36,7 +36,7 @@ namespace Vim25Proxy
                 */
         }
 
-        public Proxy (string server)
+        public Proxy(string server)
         {
             if (string.IsNullOrWhiteSpace(server))
                 throw new ArgumentException("Argument cannot be null or empty", nameof(server));

@@ -1,9 +1,10 @@
 import React, { Component } from 'react';
 
-import { backupNow, getDrives, getContent } from '../../Data/Servers';
+import { getDrives, getContent } from '../../Data/Servers';
+import { backupNow } from '../../Data/Calendar';
 import './Windows.css';
 
-const splitName = name => {
+const splitName = function(name) {
   const splited = name.split('\\');
   if (splited.length === 2 && splited[1] === '') return [name];
 

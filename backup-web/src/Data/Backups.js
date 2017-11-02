@@ -1,10 +1,14 @@
-import { GET } from './requester';
+import { GET, DELETE } from './requester';
 import { loadData } from './withData';
 
-const allBackups = serverId => {
+const allBackups = function(serverId) {
   const uri = serverId ? `/api/backups/byserver/${serverId}` : '/api/backups';
   const dataKey = serverId ? `allBackups$${serverId}` : 'allBackups';
   return loadData(dataKey, GET(uri));
 };
 
-export { allBackups };
+const cancel = function(backupId) {
+  return DELETE(`/api/backups/${backupId}`);
+};
+
+export { allBackups, cancel };

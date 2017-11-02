@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Cassandra.Mapping;
 using Cassandra.Mapping.Attributes;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 
 namespace BackupDatabase.Models
 {
@@ -27,15 +29,19 @@ namespace BackupDatabase.Models
 
         [JsonProperty("server")]
         [Column("server")]
+        [SecondaryIndex]
+        [Required]
         public Guid Server { get; set; }
 
-        [JsonProperty("enabled")]
+        [JsonProperty("enabled", DefaultValueHandling = DefaultValueHandling.Populate)]
+        [DefaultValue(true)]
         [Column("enabled")]
         [SecondaryIndex]
         public bool Enabled { get; set; }
 
         [JsonProperty("items")]
         [Column("items")]
+        [Required]
         public IEnumerable<string> Items { get; set; }
 
         [JsonProperty("lastrun", DefaultValueHandling = DefaultValueHandling.Ignore)]
@@ -50,7 +56,8 @@ namespace BackupDatabase.Models
         [Column("firstrun")]
         public DateTime FirstRun { get; set; }
 
-        [JsonProperty("periodicity")]
+        [JsonProperty("periodicity", DefaultValueHandling = DefaultValueHandling.Populate)]
+        [DefaultValue(Periodicity.None)]
         [Column("periodicity", Type = typeof (string))]
         public Periodicity Periodicity { get; set; }
 
@@ -61,10 +68,13 @@ namespace BackupDatabase.Models
 
         public void UpdateNextRun()
         {
-
             var now = DateTime.UtcNow;
-            Array.Sort(Values);
 
+            // If required first run is in the future, do nothing
+            if (FirstRun > now)
+                return;
+
+            Array.Sort(Values);
 
             switch (Periodicity)
             {
@@ -157,9 +167,17 @@ namespace BackupDatabase.Models
                             NextRun = NextRun.AddHours(1);
                     }
                     break;
-                default: // No periodicity => disable this entry
-                    NextRun = DateTime.MaxValue;
-                    Enabled = false;
+                default: // if no periodicity
+                    // Run now if never run, disable this entry otherwise
+                    if (LastRun < FirstRun)
+                    {
+                        NextRun = now;
+                    }
+                    else
+                    {
+                        NextRun = DateTime.MaxValue;
+                        Enabled = false;
+                    }
                     break;
             }
 

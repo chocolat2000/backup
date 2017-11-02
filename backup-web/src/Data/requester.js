@@ -52,6 +52,31 @@ const POST = function (url, data) {
   });
 };
 
+const PUT = function (url, data) {
+  const options = {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(data)
+  };
+  if (AuthorizationHeader !== null) {
+    options.headers.Authorization = AuthorizationHeader;
+  }
+
+  return fetch(url, options).then(response => {
+    if (response.ok) {
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.indexOf('application/json') !== -1) {
+        return response.json();
+      }
+      return Promise.reject('response not readable');
+    }
+    return Promise.reject(response.statusText);
+  });
+};
+
+
 const DELETE = function (url) {
   const options = { method: 'DELETE' };
   if (AuthorizationHeader !== null) {
@@ -74,4 +99,4 @@ const DELETE = function (url) {
   });
 };
 
-export { setAuthorizationHeader, GET, POST, DELETE };
+export { setAuthorizationHeader, GET, POST, PUT, DELETE };

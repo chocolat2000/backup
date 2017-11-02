@@ -25,6 +25,8 @@ namespace BackupDatabase
 
         Task<Guid> AddBackup(DBBackup backup);
 
+        Task CancelBackup(Guid backupId);
+
         Task<long> BackupSize(Guid backupId);
 
         Task AddFileBlock(DBFileBlock fileBlock);
@@ -82,6 +84,8 @@ namespace BackupDatabase
         Task<IEnumerable<DBFolder>> GetFolders(Guid backup, string pre = "");
 
         Task<Guid> AddServer(DBServer server);
+
+        Task UpdateServer(DBServer server);
 
         Task DeleteServer(Guid server);
 

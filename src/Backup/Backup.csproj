@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\BackupNetworkLibrary\BackupNetworkLibrary.csproj" />
+    <ProjectReference Include="..\AgentProxy\AgentProxy.csproj" />
     <ProjectReference Include="..\BackupDatabase\BackupDatabase.csproj" />
     <ProjectReference Include="..\Vim25Proxy\Vim25Proxy.csproj" />
   </ItemGroup>

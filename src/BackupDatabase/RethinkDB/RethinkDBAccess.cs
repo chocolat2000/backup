@@ -224,6 +224,11 @@ namespace BackupDatabase.RethinkDB
             }
         }
 
+        public Task CancelBackup(Guid backupId)
+        {
+            throw new NotImplementedException();
+        }
+
         public async Task<long> BackupSize(Guid backupId)
         {
             try
@@ -665,6 +670,19 @@ namespace BackupDatabase.RethinkDB
                 throw e;
             }
 
+        }
+
+        public async Task UpdateServer(DBServer server)
+        {
+            try
+            {
+                var Q = TblServers.Update(server);
+                var result = await Q.RunResultAsync(Conn);
+            }
+            catch (Exception e)
+            {
+                throw e;
+            }
         }
 
         public async Task<Guid> AddCalendarEntry(DBCalendarEntry entry)

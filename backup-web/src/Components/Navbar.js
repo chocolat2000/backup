@@ -1,40 +1,31 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, withRouter, matchPath } from 'react-router-dom';
 
-const getNavClassName = ({ pathname, route }) => {
-  const className = 'navbar-item is-tab';
-  if (pathname.startsWith(route)) return `${className} is-active`;
-  else return className;
+import { logout } from '../Data/auth';
+
+const getNavClassName = (pathname, props) => {
+  return matchPath(pathname, props) !== null ? 'is-active' : null;
 };
 
 const Navbar = ({ location: { pathname } }) => (
-  <nav className="navbar has-shadow">
+  <div className="tabs is-boxed">
     <div className="container">
-      <div className="navbar-tabs">
-        <Link className={getNavClassName({ pathname, route: '/' })} to="/">
-          Home
-        </Link>
-        <Link
-          className={getNavClassName({ pathname, route: '/servers' })}
-          to="/servers"
-        >
-          Servers
-        </Link>
-        <Link
-          className={getNavClassName({ pathname, route: '/backups' })}
-          to="/backups"
-        >
-          Backups
-        </Link>
-        <Link
-          className={getNavClassName({ pathname, route: '/calendar' })}
-          to="/calendar"
-        >
-          Calendar
-        </Link>
-      </div>
+      <ul>
+        <li className={getNavClassName(pathname, { path: '/backups' })}>
+          <Link to="/backups">Backups</Link>
+        </li>
+        <li className={getNavClassName(pathname, { path: '/servers' })}>
+          <Link to="/servers">Servers</Link>
+        </li>
+        <li className={getNavClassName(pathname, { path: '/calendar' })}>
+          <Link to="/calendar">Calendar</Link>
+        </li>
+        <li>
+          <a onClick={logout}>Logout</a>
+        </li>
+      </ul>
     </div>
-  </nav>
+  </div>
 );
 
-export default Navbar;
+export default withRouter(Navbar);

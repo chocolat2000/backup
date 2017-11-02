@@ -10,14 +10,14 @@ using Backup.Services;
 using BackupDatabase;
 using BackupDatabase.Models;
 using BackupNetworkLibrary.Model;
+using AgentProxy;
 
 namespace Backup.Runners
 {
     public class AgentBackup : IBackupServiceCallback
     {
         private IMetaDBAccess metaDB;
-        private IBackupService backupServiceProxy;
-        private IStreamService streamServiceProxy;
+        private WindowsProxy agentProxy;
 
         private BlockingCollection<BackupItem> itemsQueue = new BlockingCollection<BackupItem>(new ConcurrentQueue<BackupItem>());
         private CancellationTokenSource cancelSource;
@@ -35,28 +35,22 @@ namespace Backup.Runners
             backup = null;
         }
 
-        public async Task Run(Guid serverId, string[] items)
+        public async Task Run(Guid serverId, string[] items, CancellationTokenSource cancelSource = null)
         {
             if (backup != null)
                 return;
 
+            if (cancelSource == null)
+                this.cancelSource = new CancellationTokenSource();
+            else
+                this.cancelSource = cancelSource;
+
             var server = await metaDB.GetWindowsServer(serverId);
 
-            var backupTcpBinding = new NetTcpBinding();
-            var streamTcpBinding = new NetTcpBinding(SecurityMode.None);
-            streamTcpBinding.TransferMode = TransferMode.StreamedResponse;
-            streamTcpBinding.ReceiveTimeout = TimeSpan.FromMinutes(30);
-            streamTcpBinding.SendTimeout = TimeSpan.FromMinutes(30);
-            //streamTcpBinding.OpenTimeout = TimeSpan.FromMinutes(30);
-            //streamTcpBinding.CloseTimeout = TimeSpan.FromMinutes(30);
-            streamTcpBinding.MaxBufferSize = 65536;
-            streamTcpBinding.MaxReceivedMessageSize = 10995116277760; // 10To
-
-            var backupFactory = new DuplexChannelFactory<IBackupService>(new InstanceContext(this), backupTcpBinding, new EndpointAddress("net.tcp://localhost:8733/Backup/"));
-            var streamFactory = new ChannelFactory<IStreamService>(streamTcpBinding, new EndpointAddress("net.tcp://localhost:8734/Streaming/"));
-
-            backupServiceProxy = backupFactory.CreateChannel();
-            streamServiceProxy = streamFactory.CreateChannel();
+            agentProxy = new WindowsProxy(server.Ip, server.Username, server.Password)
+            {
+                BackupServiceCallback = this
+            };
 
             backup = new DBBackup { Server = serverId, StartDate = DateTime.Now.ToUniversalTime(), Status = Status.Running, Log = new List<string>() };
             backup.Id = await metaDB.AddBackup(backup);
@@ -64,7 +58,7 @@ namespace Backup.Runners
 
             try
             {
-                await backupServiceProxy.BackupAsync(items, backup.Id);
+                await agentProxy.Backup(items, backup.Id);
             }
             catch (EndpointNotFoundException)
             {
@@ -75,13 +69,12 @@ namespace Backup.Runners
                 return;
             }
 
-            cancelSource = new CancellationTokenSource();
-
+           
             while (true)
             {
                 BackupItem item = null;
 
-                if (cancelSource.IsCancellationRequested)
+                if (this.cancelSource.IsCancellationRequested)
                 {
                     if (itemsQueue.Count > 0)
                     {
@@ -94,7 +87,7 @@ namespace Backup.Runners
                 {
                     try
                     {
-                        item = itemsQueue.Take(cancelSource.Token);
+                        item = itemsQueue.Take(this.cancelSource.Token);
                     }
                     catch (OperationCanceledException)
                     {
@@ -125,7 +118,7 @@ namespace Backup.Runners
 
             try
             {
-                await backupServiceProxy.BackupCompleteAsync(backup.Id);
+                await agentProxy.BackupComplete(backup.Id);
             }
             catch (Exception)
             {
@@ -138,7 +131,7 @@ namespace Backup.Runners
                 await metaDB.AddBackup(backup);
             }
 
-            cancelSource.Dispose();
+            this.cancelSource.Dispose();
             backup = null;
         }
 
@@ -166,7 +159,7 @@ namespace Backup.Runners
             var totalBlocks = 0;
             try
             {
-                var stream = await streamServiceProxy.GetStreamAsync(file.StreamGuid);
+                var stream = await agentProxy.GetStream(file.StreamGuid);
 
                 hasher.Initialize();
 
@@ -182,10 +175,15 @@ namespace Backup.Runners
                 Console.WriteLine("Backup file : " + file.Name);
 
                 IList<byte[]> newbLocks;
-                var readCount = await stream.ReadAsync(buffer, 0, buffer.Length);
+                var readCount = await stream.ReadAsync(buffer, 0, buffer.Length, cancelSource.Token);
 
                 while (readCount > 0)
                 {
+                    if(cancelSource.IsCancellationRequested)
+                    {
+                        throw new Exception("Operation Cancelled");
+                    }
+
                     newbLocks = hasher.NextBlock(buffer, 0, readCount);
                     foreach (var newbLock in newbLocks)
                     {
@@ -194,7 +192,7 @@ namespace Backup.Runners
                         currentFilePos += newbLock.Length;
                         totalBlocks++;
                     }
-                    readCount = await stream.ReadAsync(buffer, 0, buffer.Length);
+                    readCount = await stream.ReadAsync(buffer, 0, buffer.Length, cancelSource.Token);
                 }
 
                 if (hasher.HasRemainingBytes)

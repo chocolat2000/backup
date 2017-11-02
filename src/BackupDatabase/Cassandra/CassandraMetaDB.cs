@@ -200,7 +200,6 @@ namespace BackupDatabase.Cassandra
 
         public CassandraMetaDB(params string[] addresses)
         {
-            PasswordsKey = null;
             casCluster = Cluster.Builder().AddContactPoints(addresses).Build();
         }
 
@@ -214,6 +213,15 @@ namespace BackupDatabase.Cassandra
             }
             await TblBackups.Insert(backup, false).ExecuteAsync().ConfigureAwait(false);
             return backup.Id;
+        }
+
+        public async Task CancelBackup(Guid backupId)
+        {
+            var backup = await TblBackups.Where(b => b.Id == backupId).FirstOrDefault().ExecuteAsync().ConfigureAwait(false);
+            await TblBackups
+                .Where(b => b.Server == backup.Server && b.StartDate == backup.StartDate)
+                .Select(b => new DBBackup { Status = Status.Cancelled })
+                .Update().ExecuteAsync().ConfigureAwait(false);
         }
 
         public async Task<Guid> AddCalendarEntry(DBCalendarEntry entry)
@@ -404,7 +412,7 @@ namespace BackupDatabase.Cassandra
         public async Task<IEnumerable<DBCalendarEntry>> GetNextEntries()
         {
             //return await TblCalendarEntry.Where(e => e.NextRun <= DateTime.UtcNow).AllowFiltering().ExecuteAsync().ConfigureAwait(false);
-            var mapper = new Mapper(conn);
+            var mapper = new Mapper(Conn);
             return await mapper.FetchAsync<DBCalendarEntry>("SELECT * from calendar WHERE enabled=true AND nextrun <= ? ALLOW FILTERING", DateTime.UtcNow);
         }
 
@@ -435,7 +443,7 @@ namespace BackupDatabase.Cassandra
                 {
                     vmwareServer.Password = await encrypt.Enrypt(vmwareServer.Password);
                 }
-                await TblVMwareServer.Insert(vmwareServer, false).ExecuteAsync().ConfigureAwait(false);
+                await TblVMwareServer.Insert(vmwareServer, false).IfNotExists().ExecuteAsync().ConfigureAwait(false);
             }
             else if (server is DBWindowsServer windowsServer)
             {
@@ -443,10 +451,30 @@ namespace BackupDatabase.Cassandra
                 {
                     windowsServer.Password = await encrypt.Enrypt(windowsServer.Password);
                 }
-                await TblWindowsServer.Insert(windowsServer, false).ExecuteAsync().ConfigureAwait(false);
+                await TblWindowsServer.Insert(windowsServer, false).IfNotExists().ExecuteAsync().ConfigureAwait(false);
             }
 
             return server.Id;
+        }
+
+        public async Task UpdateServer(DBServer server)
+        {
+            if (server is DBVMwareServer vmwareServer)
+            {
+                if (!string.IsNullOrWhiteSpace(vmwareServer.Password) && encrypt != null)
+                {
+                    vmwareServer.Password = await encrypt.Enrypt(vmwareServer.Password);
+                }
+                var result = await TblVMwareServer.Insert(vmwareServer, false).ExecuteAsync().ConfigureAwait(false);
+            }
+            else if (server is DBWindowsServer windowsServer)
+            {
+                if (!string.IsNullOrWhiteSpace(windowsServer.Password) && encrypt != null)
+                {
+                    windowsServer.Password = await encrypt.Enrypt(windowsServer.Password);
+                }
+                var result = await TblWindowsServer.Insert(windowsServer, false).ExecuteAsync().ConfigureAwait(false);
+            }
         }
 
         public async Task DeleteServer(Guid server)

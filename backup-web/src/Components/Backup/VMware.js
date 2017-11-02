@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 
-import { backupNow } from '../../Data/Servers';
+import { backupNow } from '../../Data/Calendar';
 import { serverDetails } from '../../Data/Servers';
 
 class VMware extends Component {

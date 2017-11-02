@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.27004.2002
+VisualStudioVersion = 15.0.27004.2005
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{8B1081C5-04F4-4BB9-BE6A-51F354CE6744}"
 EndProject
@@ -17,7 +17,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BackupNetworkLibrary", "Bac
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "vixDiskLib_Wrap", "vixDiskLib_Wrap\vixDiskLib_Wrap.vcxproj", "{F1994A74-1153-46A2-A196-07A14ECB50C1}"
 EndProject
-Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "dotnet", "..\..\..\..\..\..\Program Files\dotnet\dotnet.exe", "{734EEF7B-4893-4CBE-993B-CE3A2317717C}"
+Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "dotnet", "..\..\..\..\..\Program Files\dotnet\dotnet.exe", "{734EEF7B-4893-4CBE-993B-CE3A2317717C}"
 	ProjectSection(DebuggerProjectSystem) = preProject
 		PortSupplier = 00000000-0000-0000-0000-000000000000
 		Executable = C:\Program Files\dotnet\dotnet.exe
@@ -31,11 +31,13 @@ Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "dotnet", "..\..\..\..\..\..
 		AttachLaunchAction = No
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BackupWeb", "src\BackupWebAPI\BackupWebAPI.csproj", "{AF98E30D-B495-4401-9247-A816778D8274}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BackupWebAPI", "src\BackupWebAPI\BackupWebAPI.csproj", "{AF98E30D-B495-4401-9247-A816778D8274}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Vim25Proxy", "src\Vim25Proxy\Vim25Proxy.csproj", "{D934D84D-01FD-4DA3-85A6-47F45665B9E2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Crypto", "src\Crypto\Crypto.csproj", "{619CBBBA-945A-48E0-9C26-29560BBCE8C0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Crypto", "src\Crypto\Crypto.csproj", "{619CBBBA-945A-48E0-9C26-29560BBCE8C0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentProxy", "src\AgentProxy\AgentProxy.csproj", "{E4E2EF0C-63FA-4561-9850-520AB8484FAA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -147,6 +149,18 @@ Global
 		{619CBBBA-945A-48E0-9C26-29560BBCE8C0}.Release|x64.Build.0 = Release|Any CPU
 		{619CBBBA-945A-48E0-9C26-29560BBCE8C0}.Release|x86.ActiveCfg = Release|Any CPU
 		{619CBBBA-945A-48E0-9C26-29560BBCE8C0}.Release|x86.Build.0 = Release|Any CPU
+		{E4E2EF0C-63FA-4561-9850-520AB8484FAA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E4E2EF0C-63FA-4561-9850-520AB8484FAA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E4E2EF0C-63FA-4561-9850-520AB8484FAA}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E4E2EF0C-63FA-4561-9850-520AB8484FAA}.Debug|x64.Build.0 = Debug|Any CPU
+		{E4E2EF0C-63FA-4561-9850-520AB8484FAA}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E4E2EF0C-63FA-4561-9850-520AB8484FAA}.Debug|x86.Build.0 = Debug|Any CPU
+		{E4E2EF0C-63FA-4561-9850-520AB8484FAA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E4E2EF0C-63FA-4561-9850-520AB8484FAA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E4E2EF0C-63FA-4561-9850-520AB8484FAA}.Release|x64.ActiveCfg = Release|Any CPU
+		{E4E2EF0C-63FA-4561-9850-520AB8484FAA}.Release|x64.Build.0 = Release|Any CPU
+		{E4E2EF0C-63FA-4561-9850-520AB8484FAA}.Release|x86.ActiveCfg = Release|Any CPU
+		{E4E2EF0C-63FA-4561-9850-520AB8484FAA}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -157,6 +171,7 @@ Global
 		{AF98E30D-B495-4401-9247-A816778D8274} = {8B1081C5-04F4-4BB9-BE6A-51F354CE6744}
 		{D934D84D-01FD-4DA3-85A6-47F45665B9E2} = {8B1081C5-04F4-4BB9-BE6A-51F354CE6744}
 		{619CBBBA-945A-48E0-9C26-29560BBCE8C0} = {8B1081C5-04F4-4BB9-BE6A-51F354CE6744}
+		{E4E2EF0C-63FA-4561-9850-520AB8484FAA} = {8B1081C5-04F4-4BB9-BE6A-51F354CE6744}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {162BE2AD-257A-4AC5-9483-87A7EE0845C2}
