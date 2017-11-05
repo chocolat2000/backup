@@ -1,7 +1,9 @@
 import React, { Component } from 'react';
 import { FormVMware, FormWindows } from './Forms';
 
-import { addServer } from '../../Data/Servers';
+import { connect } from 'react-redux';
+
+import { addServer } from '../../Data/actions/severs';
 
 class Add extends Component {
   constructor(props) {
@@ -15,11 +17,7 @@ class Add extends Component {
 
   handleSubmit = event => {
     event.preventDefault();
-
-    addServer(this.state).then(newId => {
-      const { props: { history } } = this;
-      history.replace(`/servers/details/${newId}`);
-    });
+    this.props.addServer(this.state);
   };
 
   render() {
@@ -74,4 +72,16 @@ class Add extends Component {
   }
 }
 
-export default Add;
+const mapStateToProps = () => {
+  return {};
+};
+
+const mapDispatchToProps = dispatch => {
+  return {
+    addServer: server => {
+      dispatch(addServer(server));
+    }
+  };
+};
+
+export default connect(mapStateToProps, mapDispatchToProps)(Add);

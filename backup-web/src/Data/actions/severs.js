@@ -13,75 +13,94 @@ export const RECEIVE_SERVERS = 'RECEIVE_SERVERS';
 
 export const getServers = () => dispatch => {
   dispatch({ type: REQUEST_SERVERS });
-  GET('/api/servers')
-    .then(servers => {
+  return GET('/api/servers').then(
+    servers => {
       dispatch({ type: RECEIVE_SERVERS, list: servers });
-    })
-    .catch(message => {
+    },
+    message => {
       dispatch(addError(message));
-    });
+    }
+  );
 };
 
 export const serverDetails = (serverId, refresh) => dispatch => {
   dispatch({ type: REQUEST_SERVER, serverId });
-  GET(`/api/servers/${serverId}?refresh=${refresh ? 'true' : 'false'}`)
-    .then(server => {
+  return GET(
+    `/api/servers/${serverId}?refresh=${refresh ? 'true' : 'false'}`
+  ).then(
+    server => {
       dispatch({ type: RECEIVE_SERVER, serverId, server });
-    })
-    .catch(message => {
+    },
+    message => {
       dispatch(addError(message));
-    });
+    }
+  );
+};
+
+export const addServer = server => dispatch => {
+  return POST(`/api/servers/${server.type}`, server).then(
+    () => {
+      dispatch(getServers());
+    },
+    message => {
+      dispatch(addError(message));
+    }
+  );
 };
 
 export const deleteServer = serverId => dispatch => {
-  DELETE(`/api/servers/${serverId}`)
-    .then(() => {
+  return DELETE(`/api/servers/${serverId}`).then(
+    () => {
       dispatch(getServers());
-    })
-    .catch(message => {
+    },
+    message => {
       dispatch(addError(message));
-    });
+    }
+  );
 };
 
 export const updateServer = server => dispatch => {
   const serverId = server.id;
   dispatch({ type: REQUEST_UPDATE_SERVER, serverId });
-  PUT(`/api/servers/${serverId}`, server)
-    .then(server => {
+  return PUT(`/api/servers/${serverId}`, server).then(
+    server => {
       dispatch({ type: RECEIVE_UPDATE_SERVER, serverId, server });
-    })
-    .catch(message => {
+    },
+    message => {
       dispatch(addError(message));
-    });
+    }
+  );
 };
 
 export const getContent = (serverId, folder) => dispatch => {
   dispatch({ type: REQUEST_FOLDER, serverId });
   if (typeof folder === 'string') {
     const uriPath = encodeURIComponent(folder);
-    GET(`/api/servers/${serverId}/content?folder=${uriPath}`)
-      .then(content => {
+    return GET(`/api/servers/${serverId}/content?folder=${uriPath}`).then(
+      content => {
         dispatch({
           type: RECEIVE_FOLDER,
           folder,
           serverId,
           content
         });
-      })
-      .catch(message => {
+      },
+      message => {
         dispatch(addError(message));
-      });
+      }
+    );
   } else {
-    GET(`/api/servers/${serverId}/drives`)
-      .then(drives => {
+    return GET(`/api/servers/${serverId}/drives`).then(
+      drives => {
         dispatch({
           type: RECEIVE_FOLDER,
           serverId,
           content: { folders: drives }
         });
-      })
-      .catch(message => {
+      },
+      message => {
         dispatch(addError(message));
-      });
+      }
+    );
   }
 };

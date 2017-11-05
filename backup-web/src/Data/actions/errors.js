@@ -11,6 +11,4 @@ export const addError = message => dispatch => {
   }, 5000);
 };
 
-export const clearError = id => dispatch => {
-  dispatch({ type: CLEAR_ERROR, id });
-};
+export const clearError = id => ({ type: CLEAR_ERROR, id });

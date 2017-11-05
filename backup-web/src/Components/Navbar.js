@@ -1,13 +1,14 @@
 import React from 'react';
 import { Link, withRouter, matchPath } from 'react-router-dom';
 
-import { logout } from '../Data/auth';
+import { connect } from 'react-redux';
+import { logout } from '../Data/actions/auth';
 
 const getNavClassName = (pathname, props) => {
   return matchPath(pathname, props) !== null ? 'is-active' : null;
 };
 
-const Navbar = ({ location: { pathname } }) => (
+const Navbar = ({ location: { pathname }, logout }) => (
   <div className="tabs is-boxed">
     <div className="container">
       <ul>
@@ -28,4 +29,16 @@ const Navbar = ({ location: { pathname } }) => (
   </div>
 );
 
-export default withRouter(Navbar);
+const mapStateToProps = () => {
+  return {};
+};
+
+const mapDispatchToProps = dispatch => {
+  return {
+    logout: () => {
+      dispatch(logout());
+    }
+  };
+};
+
+export default connect(mapStateToProps, mapDispatchToProps)(withRouter(Navbar));
