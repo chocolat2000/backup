@@ -1,18 +1,19 @@
 ﻿using System;
 using Cassandra.Mapping;
 using Cassandra.Mapping.Attributes;
+using Newtonsoft.Json;
 
 namespace BackupDatabase.Models
 {
     [Table(Name = "blocks")]
     public class DBBlock
     {
-        [Column("id")]
-        [Ignore]
-        public Guid Id { get; set; }
+        [JsonProperty("murmur")]
         [Column("murmur")]
         [PartitionKey]
         public Guid Murmur { get; set; }
+
+        [JsonProperty("data")]
         [Column("data")]
         public byte[] Data { get; set; }
     }

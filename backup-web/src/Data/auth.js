@@ -5,25 +5,31 @@ let registredAuthListeners = {};
 let refreshTimeout = -1;
 
 const isAuthenticated = function() {
-  const authData = {
-    token: sessionStorage.getItem('jwtData'),
-    expires: sessionStorage.getItem('jwtExpires')
-  };
-  const isValid =
-    authData.token !== null && new Date(authData.expires) > new Date();
+  const token = sessionStorage.getItem('jwtData');
+  const expires = new Date(sessionStorage.getItem('jwtExpires'));
 
-  return isValid;
+  return token !== null && expires > Date.now();
 };
 
 const refreshAuth = function() {
-  GET('/api/auth/refresh').then(handleAuthResponse);
+  GET('/api/auth/refresh')
+    .then(handleAuthResponse)
+    .catch(function() {
+      const expires = new Date(sessionStorage.getItem('jwtExpires'));
+      const now = Date.now();
+      if (now < expires) {
+        var nextRefresh = (expires - now) / 2;
+        refreshTimeout = setTimeout(refreshAuth, nextRefresh);
+      }
+    });
 };
 
 if (isAuthenticated()) {
   const token = sessionStorage.getItem('jwtData');
-  const expires = sessionStorage.getItem('jwtExpires');
   setAuthorizationHeader(`Bearer ${token}`);
-  var nextRefresh = (new Date(expires) - new Date()) / 2;
+
+  const expires = new Date(sessionStorage.getItem('jwtExpires'));
+  var nextRefresh = (expires - Date.now()) / 2;
   refreshTimeout = setTimeout(refreshAuth, nextRefresh);
 }
 
@@ -48,8 +54,8 @@ const logout = function() {
 const handleAuthResponse = function({ token, expires }) {
   setAuthorizationHeader(`Bearer ${token}`);
   sessionStorage.setItem('jwtData', token);
-  sessionStorage.setItem('jwtExpires', new Date(expires));
-  var nextRefresh = (new Date(expires) - new Date()) / 2;
+  sessionStorage.setItem('jwtExpires', expires);
+  var nextRefresh = (new Date(expires) - Date.now()) / 2;
   refreshTimeout = setTimeout(refreshAuth, nextRefresh);
   Object.keys(registredAuthListeners).forEach(listenerId => {
     const { authenticated } = registredAuthListeners[listenerId];

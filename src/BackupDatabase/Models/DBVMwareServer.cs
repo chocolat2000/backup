@@ -1,8 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using Newtonsoft.Json;
-using Cassandra.Mapping;
+﻿using System.Collections.Generic;
 using Cassandra.Mapping.Attributes;
+using Newtonsoft.Json;
 
 namespace BackupDatabase.Models
 {

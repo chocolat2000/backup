@@ -261,10 +261,6 @@ namespace BackupDatabase.Cassandra
 
         public async Task<Guid> AddFolder(DBFolder folder)
         {
-            if (folder.Id == Guid.Empty)
-            {
-                folder.Id = Guid.NewGuid();
-            }
             await TblFolder.Insert(folder, false).ExecuteAsync().ConfigureAwait(false);
             return folder.Id;
         }
@@ -281,10 +277,6 @@ namespace BackupDatabase.Cassandra
 
         public async Task AddVMDiskBlock(DBVMDiskBlock vmDiskBlock)
         {
-            if (vmDiskBlock.Id == Guid.Empty)
-            {
-                vmDiskBlock.Id = Guid.NewGuid();
-            }
             await TblVMDiskBlocks.Insert(vmDiskBlock, false).ExecuteAsync().ConfigureAwait(false);
         }
 

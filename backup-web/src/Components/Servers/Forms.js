@@ -1,10 +1,13 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-const formVMware = (
-  { id, name, ip, username, password },
-  { onChange, onSubmit, withName, withBackupNow }
-) => (
+export const FormVMware = ({
+  server: { id, name, ip, username, password, isUpdating },
+  onChange,
+  onSubmit,
+  withName,
+  withBackupNow
+}) => (
   <form onSubmit={onSubmit}>
     {withName && (
       <div className="field is-horizontal">
@@ -82,7 +85,11 @@ const formVMware = (
       <div className="field-body">
         <div className="field is-grouped">
           <div className="control">
-            <button type="submit" className="button is-primary">
+            <button
+              type="submit"
+              className="button is-primary"
+              disabled={isUpdating}
+            >
               Save
             </button>
           </div>
@@ -93,16 +100,24 @@ const formVMware = (
               </Link>
             </div>
           )}
+          {isUpdating && (
+            <div className="control">
+              <i className="fa fa-spinner fa-pulse fa-2x" />
+            </div>
+          )}
         </div>
       </div>
     </div>
   </form>
 );
 
-const formWindows = (
-  { id, name, ip, username, password },
-  { onChange, onSubmit, withName, withBackupNow }
-) => (
+export const FormWindows = ({
+  server: { id, name, ip, username, password, isUpdating },
+  onChange,
+  onSubmit,
+  withName,
+  withBackupNow
+}) => (
   <form onSubmit={onSubmit}>
     {withName && (
       <div className="field is-horizontal">
@@ -180,7 +195,11 @@ const formWindows = (
       <div className="field-body">
         <div className="field is-grouped">
           <div className="control">
-            <button type="submit" className="button is-primary">
+            <button
+              type="submit"
+              className="button is-primary"
+              disabled={isUpdating}
+            >
               Save
             </button>
           </div>
@@ -191,10 +210,13 @@ const formWindows = (
               </Link>
             </div>
           )}
+          {isUpdating && (
+            <div className="control">
+              <i className="fa fa-spinner fa-pulse fa-2x" />
+            </div>
+          )}
         </div>
       </div>
     </div>
   </form>
 );
-
-export { formVMware, formWindows };

@@ -1,18 +1,13 @@
-﻿using Cassandra.Mapping.Attributes;
-using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Text;
+using Cassandra.Mapping.Attributes;
+using Newtonsoft.Json;
 
 namespace BackupDatabase.Models
 {
     [Table(Name = "dbuser")]
     public class DBUser
     {
-        [JsonProperty("id", DefaultValueHandling = DefaultValueHandling.Ignore)]
-        [Ignore]
-        public Guid Id { get; set; }
-
         [JsonProperty("login")]
         [Column("login")]
         [PartitionKey]

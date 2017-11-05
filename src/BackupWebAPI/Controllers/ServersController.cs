@@ -127,7 +127,7 @@ namespace BackupWeb.Controllers
         public async Task<IActionResult> UpdateServer(Guid id, [FromBody] JToken server)
         {
             DBServer dBServer;
-            switch(await metaDB.GetServerType(id))
+            switch (await metaDB.GetServerType(id))
             {
                 case ServerType.Windows:
                     {
@@ -147,15 +147,12 @@ namespace BackupWeb.Controllers
                     break;
             }
 
-            if(dBServer == null)
+            if (dBServer == null)
             {
                 return NotFound();
             }
-            else
-            {
-                await metaDB.UpdateServer(dBServer);
-            }
-            return Ok();
+            await metaDB.UpdateServer(dBServer);
+            return Ok(dBServer);
         }
 
     }

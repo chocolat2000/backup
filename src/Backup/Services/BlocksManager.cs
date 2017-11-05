@@ -180,6 +180,7 @@ namespace Backup.Services
                     await dataDB.WriteBlock(blockGuid, block, length);
                     await hashesDB.AddHash(blockhash, blockGuid);
                 }
+                await hashesDB.IncReference(blockGuid, blockhash);
             }
             catch (Exception e)
             {

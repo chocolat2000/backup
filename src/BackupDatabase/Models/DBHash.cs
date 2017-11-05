@@ -1,22 +1,20 @@
-﻿using Newtonsoft.Json;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using Cassandra.Mapping;
+﻿using System;
 using Cassandra.Mapping.Attributes;
+using Newtonsoft.Json;
 
 namespace BackupDatabase.Models
 {
     [Table(Name = "hashes")]
     public class DBHash
     {
-        [JsonProperty("id", DefaultValueHandling = DefaultValueHandling.Ignore)]
-        [Column("id")]
+        [JsonProperty("hash")]
+        [Column("hash")]
         [PartitionKey]
-        public Guid Id { get; set; }
+        public Guid Hash { get; set; }
 
-        [JsonProperty("blocks")]
-        [Column("blocks", Type = typeof (List<Guid>))]
-        public IEnumerable<Guid> Blocks { get; set; }
+        [JsonProperty("block")]
+        [Column("block")]
+        [ClusteringKey]
+        public Guid Block { get; set; }
     }
 }

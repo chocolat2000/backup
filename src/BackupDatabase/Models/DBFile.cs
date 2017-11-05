@@ -1,19 +1,13 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Cassandra.Mapping;
+﻿using System;
 using Cassandra.Mapping.Attributes;
-
+using Newtonsoft.Json;
 
 namespace BackupDatabase.Models
 {
     [Table(Name = "files")]
     public class DBFile
     {
-        [JsonProperty("id", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        [JsonProperty("id")]
         [Column("id")]
         public Guid Id { get; set; }
 

@@ -1,17 +1,15 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using Cassandra.Mapping;
 using Cassandra.Mapping.Attributes;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 
 namespace BackupDatabase.Models
 {
     [Table(Name = "dbbackup")]
     public class DBBackup
     {
-        [JsonProperty("id", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        [JsonProperty("id")]
         [Column("id")]
         [SecondaryIndex]
         public Guid Id { get; set; }
@@ -41,9 +39,17 @@ namespace BackupDatabase.Models
 
         public void AppendLog(string line)
         {
-            var log = Log.ToList();
-            log.Add(line);
-            Log = log;
+            if (Log is List<string>)
+            {
+                ((List<string>)Log).Add(line);
+            }
+            else
+            {
+                Log = new List<string>(Log)
+                {
+                    line
+                };
+            }
         }
 
     }

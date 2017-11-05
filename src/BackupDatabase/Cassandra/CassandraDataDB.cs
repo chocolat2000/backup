@@ -52,7 +52,7 @@ namespace BackupDatabase.Cassandra
             var guidArray = id.ToString();
 
             return blocksTable[$"{guidArray[0]}{guidArray[1]}"]
-                .Where((b) => b.Id == id).Select((b) => b.Data)
+                .Where((b) => b.Murmur == id).Select((b) => b.Data)
                 .FirstOrDefault()
                 .ExecuteAsync();
         }
@@ -67,7 +67,7 @@ namespace BackupDatabase.Cassandra
             var guidArray = id.ToString();
             var block = new DBBlock
             {
-                Id = id
+                Murmur = id
             };
 
             if (length < data.Length)

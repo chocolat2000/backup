@@ -4,14 +4,16 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+using Cassandra.Data.Linq;
+using BackupDatabase.Models;
 
 namespace BackupDatabase.Cassandra
 {
     public class CassandraHashesDB : IDBHashes
     {
         private Cluster CasCluster;
-        private PreparedStatement InsertStatement => Session.Prepare("INSERT INTO hashes (hash, block) VALUES (?, ?)");
-        private PreparedStatement SelectStatement => Session.Prepare("SELECT block FROM hashes WHERE hash=?");
+        //private PreparedStatement InsertStatement => Session.Prepare("INSERT INTO hashes (hash, block) VALUES (?, ?)");
+        //private PreparedStatement SelectStatement => Session.Prepare("SELECT block FROM hashes WHERE hash=?");
 
         private ISession session = null;
         private ISession Session
@@ -23,32 +25,68 @@ namespace BackupDatabase.Cassandra
                     session = CasCluster.Connect();
                     session.CreateKeyspaceIfNotExists("backup");
                     session.ChangeKeyspace("backup");
-                    session.Execute(
-                        "CREATE TABLE IF NOT EXISTS hashes (" +
-                        "hash uuid," +
-                        "block uuid," +
-                        "PRIMARY KEY (hash, block)" +
-                        ")");
-
                 }
                 return session;
             }
         }
+
+        private Table<DBHash> tblDBHash;
+        private Table<DBHash> TblDBHash
+        {
+            get
+            {
+                if (tblDBHash == null)
+                {
+                    tblDBHash = new Table<DBHash>(Session);
+                    tblDBHash.CreateIfNotExists();
+                }
+                return tblDBHash;
+            }
+        }
+
+        private Table<DBBlockReferences> tblDBBlockReferences;
+        private Table<DBBlockReferences> TblDBBlockReferences
+        {
+            get
+            {
+                if (tblDBBlockReferences == null)
+                {
+                    tblDBBlockReferences = new Table<DBBlockReferences>(Session);
+                    tblDBBlockReferences.CreateIfNotExists();
+                }
+                return tblDBBlockReferences;
+            }
+        }
+
+
 
         public CassandraHashesDB(params string[] addresses)
         {
             CasCluster = Cluster.Builder().AddContactPoints(addresses).Build();
         }
 
+        public async Task IncReference(Guid block, Guid hash)
+        {
+            await TblDBBlockReferences.Where(r => r.Block == block && r.Hash == hash).Select(r => new DBBlockReferences { References = r.References + 1 }).Update().ExecuteAsync().ConfigureAwait(false);
+        }
+
+        public async Task DecReference(Guid block, Guid hash)
+        {
+            await TblDBBlockReferences.Where(r => r.Block == block && r.Hash == hash).Select(r => new DBBlockReferences { References = r.References - 1 }).Update().ExecuteAsync().ConfigureAwait(false);
+        }
+
         public async Task AddHash(Guid hash, Guid block)
         {
-            await Session.ExecuteAsync(InsertStatement.Bind(hash, block)).ConfigureAwait(false);
+            //await Session.ExecuteAsync(InsertStatement.Bind(hash, block)).ConfigureAwait(false);
+            await TblDBHash.Insert(new DBHash { Hash = hash, Block = block }).ExecuteAsync().ConfigureAwait(false);
         }
 
         public async Task<IEnumerable<Guid>> GetBlocksFromHash(Guid hash)
         {
-            var rowSet = await Session.ExecuteAsync(SelectStatement.Bind(hash)).ConfigureAwait(false);
-            return rowSet.Select(row => row.GetValue<Guid>("block"));
+            //var rowSet = await Session.ExecuteAsync(SelectStatement.Bind(hash)).ConfigureAwait(false);
+            //return rowSet.Select(row => row.GetValue<Guid>("block"));
+
+            return await TblDBHash.Where(dbhash => dbhash.Hash == hash).Select(dbhash => dbhash.Block).ExecuteAsync().ConfigureAwait(false);
         }
 
         #region IDisposable Support

@@ -1,18 +1,19 @@
 import React, { Component } from 'react';
-import { withData } from '../../Data/withData';
-import { serverDetails, updateServer } from '../../Data/Servers';
-import { allBackups, cancel } from '../../Data/Backups';
+import { connect } from 'react-redux';
 
-import { formVMware, formWindows } from './Forms';
+import { serverDetails, updateServer } from '../../Data/actions/severs';
+import { getBackups, cancel } from '../../Data/actions/backups';
+
+import { FormVMware, FormWindows } from './Forms';
 
 import './Details.css';
 
-const renderForm = function(server, options) {
+const renderForm = ({ server, ...rest }) => {
   switch (server.type) {
     case 'Windows':
-      return formWindows(server, options);
+      return <FormWindows server={server} {...rest} />;
     case 'VMware':
-      return formVMware(server, options);
+      return <FormVMware server={server} {...rest} />;
     default:
       return <h3>Unknown server type</h3>;
   }
@@ -43,8 +44,8 @@ class Details extends Component {
     event.preventDefault();
 
     const { form } = this.state;
-    const { data: { server } } = this.props;
-    updateServer(Object.assign({}, server, form));
+    const { server } = this.props;
+    this.props.updateServer(Object.assign({}, server, form));
   };
 
   toggleLog = logId => () => {
@@ -54,17 +55,17 @@ class Details extends Component {
     });
   };
 
+  componentDidMount() {
+    this.props.serverDetails();
+    this.props.getBackups();
+  }
+
   render() {
-    const { data: { isLoading, server, backups } } = this.props;
+    const { server, backups } = this.props;
+    const { isFetching, name, type } = server;
     const { expandedlogs } = this.state;
 
-    const formOptions = {
-      withBackupNow: true,
-      onChange: this.onChange,
-      onSubmit: this.handleSubmit
-    };
-
-    if (isLoading || !server) {
+    if (isFetching) {
       return (
         <section className="section">
           <div className="container">
@@ -73,7 +74,6 @@ class Details extends Component {
         </section>
       );
     } else {
-      const { name, type } = server;
       return (
         <section className="section">
           <div className="container">
@@ -84,7 +84,12 @@ class Details extends Component {
                 </div>
               </div>
               <div className="card-content">
-                {renderForm(server, formOptions)}
+                {renderForm({
+                  server,
+                  withBackupNow: true,
+                  onChange: this.onChange,
+                  onSubmit: this.handleSubmit
+                })}
               </div>
             </div>
           </div>
@@ -109,7 +114,7 @@ class Details extends Component {
                           {status === 'Running' ? (
                             <a
                               onClick={() => {
-                                cancel(id);
+                                this.props.cancel();
                               }}
                             >
                               <span>{status}</span>
@@ -163,9 +168,32 @@ class Details extends Component {
   }
 }
 
-export default withData(Details, ({ match }) => {
-  return {
-    server: serverDetails(match.params.id),
-    backups: allBackups(match.params.id)
+const mapStateToProps = ({ servers: { list: sList }, backups: {list: bList} }, { match }) => {
+  const server = sList[match.params.id] || {
+    id: match.params.id,
+    isFetching: true
   };
-});
+  return {
+    server,
+    backups: bList
+  };
+};
+
+const mapDispatchToProps = (dispatch, { match }) => {
+  return {
+    serverDetails: () => {
+      dispatch(serverDetails(match.params.id));
+    },
+    updateServer: server => {
+      dispatch(updateServer(server));
+    },
+    getBackups: () => {
+      dispatch(getBackups(match.params.id));
+    },
+    cancel: () => {
+      dispatch(cancel(match.params.id));
+    }
+  };
+};
+
+export default connect(mapStateToProps, mapDispatchToProps)(Details);

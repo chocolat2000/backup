@@ -1,29 +1,89 @@
 import React, { Component } from 'react';
+
+import { getDrives } from '../../Data/actions/severs';
+import store from '../../Data/store';
+
+import { getContent } from '../../Data/Servers';
+import { backupNow } from '../../Data/Calendar';
 import './Windows.css';
+
+const splitName = function(name) {
+  const splited = name.split('\\');
+  if (splited.length === 2 && splited[1] === '') return [name];
+
+  let prevVal = '';
+  return splited.reduce((result, val, idx) => {
+    if (val !== '') {
+      if (prevVal === '') {
+        prevVal = `${val}\\`;
+      } else {
+        if (idx === 1) {
+          prevVal = `${prevVal}${val}`;
+        } else {
+          prevVal = `${prevVal}\\${val}`;
+        }
+      }
+      result.push(prevVal);
+    }
+    return result;
+  }, []);
+};
 
 class Windows extends Component {
   constructor(props) {
     super(props);
 
     this.state = {
-      expandeditems: [],
-      selecteditems: []
+      selecteditems: [],
+      serverfolders: {}
     };
   }
 
   startBackup = () => {
-    const { backupNow, history, server: { id } } = this.props;
+    const { data: { server: { id } } } = this.props;
     const { selecteditems } = this.state;
-    backupNow(selecteditems);
-    history.push(`/servers/details/${id}`);
+    backupNow(id, selecteditems);
+    this.props.history.push(`/servers/details/${id}`);
+  };
+
+  expandNode = name => () => {
+    const { data: { server: { id } } } = this.props;
+    const splited = splitName(name);
+
+    this.setState(({ serverfolders }) => {
+      let folder = splited.reduce((serverObject, path, index) => {
+        return index === 0 ? serverObject[path] : serverObject.folders[path];
+      }, serverfolders);
+      folder.expanded = !folder.expanded;
+      if (folder.expanded) {
+        getContent(id, name).then(content => {
+          if (!content) return;
+          this.setState(({ serverfolders }) => {
+            let folder = splited.reduce(
+              (serverObject, path, index) =>
+                index === 0 ? serverObject[path] : serverObject.folders[path],
+              serverfolders
+            );
+            folder.folders = content.folders.reduce((result, folder) => {
+              const split = folder.split('\\');
+              result[folder] = { name: split[split.length - 1] };
+              return result;
+            }, {});
+            folder.files = content.files.reduce((result, file) => {
+              const split = file.split('\\');
+              result[file] = { name: split[split.length - 1] };
+              return result;
+            }, {});
+            return { serverfolders };
+          });
+        });
+      }
+      return { serverfolders };
+    });
   };
 
   isIncluded = item => {
     return this.state.selecteditems.indexOf(item) > -1;
-  };
-
-  isExpanded = item => {
-    return this.state.expandeditems.indexOf(item) > -1;
   };
 
   toggleInclude = item => () => {
@@ -37,26 +97,10 @@ class Windows extends Component {
     });
   };
 
-  expandNode = name => () => {
-    this.setState(({ expandeditems }) => {
-      const fileIdx = expandeditems.indexOf(name);
-      if (fileIdx === -1) {
-        const { getContent } = this.props;
-        expandeditems.push(name);
-        getContent(name);
-      } else {
-        expandeditems.splice(fileIdx, 1);
-      }
-      return { expandeditems };
-    });
-  };
-
   renderFolder = (name, folder) => (
     <li key={name}>
       <a className="has-text-grey-darker" onClick={this.expandNode(name)}>
-        <i
-          className={`fa fa-folder${this.isExpanded(name) ? '-open' : ''}-o`}
-        />{' '}
+        <i className={`fa fa-folder${folder.expanded ? '-open' : ''}-o`} />{' '}
         {folder.name}
       </a>{' '}
       {this.isIncluded(name) ? (
@@ -66,7 +110,7 @@ class Windows extends Component {
           <i className="fa fa-plus-circle" />
         </a>
       )}
-      {this.isExpanded(name) && (
+      {folder.expanded && (
         <ul>
           {folder.folders &&
             Object.keys(folder.folders).map(f =>
@@ -94,14 +138,14 @@ class Windows extends Component {
   );
 
   componentDidMount() {
-    const { getContent } = this.props;
-    getContent();
+    const { data: { server: { id } } } = this.props;
+    store.dispatch(getDrives(id));
   }
 
   render() {
-    const { name, serverfolders, isFetching } = this.props.server;
+    const { data: { server: { name } } } = this.props;
 
-    const { selecteditems } = this.state;
+    const { serverfolders, selecteditems } = this.state;
 
     return (
       <section className="section">
@@ -121,10 +165,9 @@ class Windows extends Component {
             >
               <div className="tree">
                 <ul>
-                  {!isFetching &&
-                    Object.keys(serverfolders).map(f =>
-                      this.renderFolder(f, serverfolders[f])
-                    )}
+                  {Object.keys(serverfolders).map(f =>
+                    this.renderFolder(f, serverfolders[f])
+                  )}
                 </ul>
               </div>
             </div>

@@ -1,14 +1,14 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-using System;
+﻿using System;
 using Cassandra.Mapping.Attributes;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 
 namespace BackupDatabase.Models
 {
     [Table("servers")]
     public class DBServer
     {
-        [JsonProperty("id", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        [JsonProperty("id")]
         [Column("id")]
         [PartitionKey]
         public Guid Id { get; set; }
@@ -22,7 +22,7 @@ namespace BackupDatabase.Models
         [Column("ip")]
         public string Ip { get; set; }
 
-        [JsonProperty("port", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        [JsonProperty("port")]
         [Column("port")]
         public int Port { get; set; }
 

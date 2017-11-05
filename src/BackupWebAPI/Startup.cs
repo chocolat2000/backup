@@ -75,16 +75,20 @@ namespace BackupWeb
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IHostingEnvironment env)
         {
+            /*
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
-                //app.UseBrowserLink();
             }
             else
             {
-                app.UseExceptionHandler("/Home/Error");
+                app.UseExceptionHandler("/api/Exception");
             }
+            */
 
+            app.UseExceptionHandler("/api/Exception");
+
+            /*
             app.Use(async (context, next) =>
             {
                 var authenticateInfo = await context.AuthenticateAsync("Bearer");
@@ -93,7 +97,7 @@ namespace BackupWeb
                 await next.Invoke();
                 // Do logging or other work that doesn't write to the Response.
             });
-
+            */
             app.UseStaticFiles();
             app.UseAuthentication();
 

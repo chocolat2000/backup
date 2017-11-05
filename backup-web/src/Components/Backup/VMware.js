@@ -1,8 +1,5 @@
 import React, { Component } from 'react';
 
-import { backupNow } from '../../Data/Calendar';
-import { serverDetails } from '../../Data/Servers';
-
 class VMware extends Component {
   constructor(props) {
     super(props);
@@ -27,13 +24,12 @@ class VMware extends Component {
   };
 
   startBackup = () => {
-    const { data: { server: { id } } } = this.props;
     const { selectedvms } = this.state;
-    backupNow(id, selectedvms);
+    this.props.backupNow(selectedvms);
   };
 
   render() {
-    const { data: { server: { id, name, vms } } } = this.props;
+    const { serverDetails, server: { name, vms } } = this.props;
     const vmsArray = Object.entries(vms);
 
     let vmSplices = [];
@@ -78,10 +74,7 @@ class VMware extends Component {
               </button>
             </div>
             <div className="control">
-              <button
-                className="button"
-                onClick={() => serverDetails(id, true)}
-              >
+              <button className="button" onClick={() => serverDetails(true)}>
                 <span className="icon">
                   <i className="fa fa-refresh" aria-hidden="true" />
                 </span>

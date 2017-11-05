@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { formVMware, formWindows } from './Forms';
+import { FormVMware, FormWindows } from './Forms';
 
 import { addServer } from '../../Data/Servers';
 
@@ -31,10 +31,10 @@ class Add extends Component {
     };
     switch (this.state.type) {
       case 'Windows':
-        detailsForm = formWindows(this.state, formProperties);
+        detailsForm = <FormWindows server={this.state} {...formProperties} />;
         break;
       case 'VMware':
-        detailsForm = formVMware(this.state, formProperties);
+        detailsForm = <FormVMware server={this.state} {...formProperties} />;
         break;
       default:
         detailsForm = <div />;

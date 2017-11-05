@@ -1,15 +1,13 @@
-﻿using Newtonsoft.Json;
-using System;
-using Cassandra.Mapping;
+﻿using System;
 using Cassandra.Mapping.Attributes;
-
+using Newtonsoft.Json;
 
 namespace BackupDatabase.Models
 {
     [Table(Name = "file_blocks")]
     public class DBFileBlock
     {
-        [JsonProperty("id", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        [JsonProperty("id")]
         [Column("id")]
         [PartitionKey]
         public Guid Id { get; set; }

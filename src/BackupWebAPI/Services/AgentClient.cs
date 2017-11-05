@@ -7,6 +7,7 @@ using System.Net;
 using System.ServiceModel;
 using System.Threading.Tasks;
 using AgentProxy;
+using AgentProxy.Exceptions;
 
 namespace BackupWeb.Services
 {
@@ -40,27 +41,53 @@ namespace BackupWeb.Services
         public async Task<string[]> GetDrives(Guid id)
         {
             var proxy = GetWindowsProxy(id);
+
             try
             {
                 return await proxy.GetDrives();
             }
-            catch(Exception e)
+            catch (AgentNotFoundException)
             {
-                return null;
+                windowsProxies.Remove(id);
+                throw new Exception("Cannot connect to remote agent.");
             }
+            catch (BadCredentialsException)
+            {
+                windowsProxies.Remove(id);
+                throw new Exception("Remote agent refused credentials.");
+            }
+            catch (CommunicationFaultedException)
+            {
+                windowsProxies.Remove(id);
+                throw new Exception("Communication with agent faulted.");
+            }
+
         }
 
         public async Task<FolderContent> GetContent(Guid id, string folder)
         {
             var proxy = GetWindowsProxy(id);
+
             try
             {
                 return await proxy.GetContent(folder);
             }
-            catch(Exception e)
+            catch (AgentNotFoundException)
             {
-                return null;
+                windowsProxies.Remove(id);
+                throw new Exception("Cannot connect to remote agent.");
             }
+            catch (BadCredentialsException)
+            {
+                windowsProxies.Remove(id);
+                throw new Exception("Remote agent refused credentials.");
+            }
+            catch (CommunicationFaultedException)
+            {
+                windowsProxies.Remove(id);
+                throw new Exception("Communication with agent faulted.");
+            }
+
         }
     }
 }

@@ -1,14 +1,14 @@
 ﻿using System;
-using Newtonsoft.Json;
 using Cassandra.Mapping;
 using Cassandra.Mapping.Attributes;
+using Newtonsoft.Json;
 
 namespace BackupDatabase.Models
 {
     [Table("vmware_vm")]
     public class DBVMwareVM
     {
-        [JsonProperty("id", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        [JsonProperty("id")]
         [Column("id")]
         public Guid Id { get; set; }
 

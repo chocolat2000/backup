@@ -1,18 +1,13 @@
 ﻿using System;
-using Newtonsoft.Json;
 using Cassandra.Mapping;
 using Cassandra.Mapping.Attributes;
+using Newtonsoft.Json;
 
 namespace BackupDatabase.Models
 {
     [Table(Name = "vmdisk_blocks")]
     public class DBVMDiskBlock
     {
-        [JsonProperty("id", DefaultValueHandling = DefaultValueHandling.Ignore)]
-        [Column("id")]
-        [Ignore]
-        public Guid Id { get; set; }
-
         [JsonProperty("vmdisk")]
         [Column("vmdisk")]
         [PartitionKey]

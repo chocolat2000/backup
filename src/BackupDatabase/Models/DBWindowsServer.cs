@@ -1,5 +1,5 @@
-﻿using Newtonsoft.Json;
-using Cassandra.Mapping.Attributes;
+﻿using Cassandra.Mapping.Attributes;
+using Newtonsoft.Json;
 
 namespace BackupDatabase.Models
 {

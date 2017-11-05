@@ -1,6 +1,5 @@
 import React, { Component } from 'react';
 import { BrowserRouter as Router, Route } from 'react-router-dom';
-
 import { isAuthenticated, registerAuthListener } from './Data/auth';
 import Login from './Components/Login';
 import Navbar from './Components/Navbar';

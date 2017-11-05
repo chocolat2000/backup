@@ -1,15 +1,15 @@
-﻿using Newtonsoft.Json;
-using System;
-using Cassandra.Mapping;
+﻿using System;
 using Cassandra.Mapping.Attributes;
+using Newtonsoft.Json;
 
 namespace BackupDatabase.Models
 {
     [Table(Name = "folders")]
     public class DBFolder
     {
-        [JsonProperty("id", DefaultValueHandling = DefaultValueHandling.Ignore)]
-        [Ignore]
+        [JsonProperty("id")]
+        [Column("id")]
+        [PartitionKey]
         public Guid Id { get; set; }
 
         [JsonProperty("name")]
@@ -19,7 +19,6 @@ namespace BackupDatabase.Models
 
         [JsonProperty("backup")]
         [Column("backup")]
-        [PartitionKey]
         public Guid Backup { get; set; }
 
         [JsonProperty("date")]

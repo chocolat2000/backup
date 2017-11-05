@@ -4,6 +4,8 @@ using System.IO;
 using System.Net;
 using System.ServiceModel;
 using System.Threading.Tasks;
+using AgentProxy.Exceptions;
+using System.ServiceModel.Security;
 
 namespace AgentProxy
 {
@@ -101,29 +103,109 @@ namespace AgentProxy
 
         }
 
-        public Task<string[]> GetDrives()
+        public async Task<string[]> GetDrives()
         {
-            return GeneralClient.GetDrivesAsync();
+            try
+            {
+                return await GeneralClient.GetDrivesAsync();
+            }
+            catch(EndpointNotFoundException)
+            {
+                throw new AgentNotFoundException();
+            }
+            catch(SecurityNegotiationException)
+            {
+                throw new BadCredentialsException();
+            }
+            catch(CommunicationObjectFaultedException)
+            {
+                throw new CommunicationFaultedException();
+            }
         }
 
-        public Task<FolderContent> GetContent(string folder)
+        public async Task<FolderContent> GetContent(string folder)
         {
-            return GeneralClient.GetContentAsync(folder);
+            try
+            {
+                return await GeneralClient.GetContentAsync(folder);
+            }
+            catch (EndpointNotFoundException)
+            {
+                throw new AgentNotFoundException();
+            }
+            catch (SecurityNegotiationException)
+            {
+                throw new BadCredentialsException();
+            }
+            catch (CommunicationObjectFaultedException)
+            {
+                throw new CommunicationFaultedException();
+            }
+
         }
 
-        public Task Backup(string[] items, Guid id)
+        public async Task Backup(string[] items, Guid id)
         {
-            return BackupClient.BackupAsync(items, id);
+            try
+            {
+                await BackupClient.BackupAsync(items, id);
+            }
+            catch (EndpointNotFoundException)
+            {
+                throw new AgentNotFoundException();
+            }
+            catch (SecurityNegotiationException)
+            {
+                throw new BadCredentialsException();
+            }
+            catch (CommunicationObjectFaultedException)
+            {
+                throw new CommunicationFaultedException();
+            }
+
+
         }
 
-        public Task BackupComplete(Guid id)
+        public async Task BackupComplete(Guid id)
         {
-            return BackupClient.BackupCompleteAsync(id);
+            try
+            {
+                await BackupClient.BackupCompleteAsync(id);
+            }
+            catch (EndpointNotFoundException)
+            {
+                throw new AgentNotFoundException();
+            }
+            catch (SecurityNegotiationException)
+            {
+                throw new BadCredentialsException();
+            }
+            catch (CommunicationObjectFaultedException)
+            {
+                throw new CommunicationFaultedException();
+            }
+
         }
 
-        public Task<Stream> GetStream(Guid id)
+        public async Task<Stream> GetStream(Guid id)
         {
-            return StreamClient.GetStreamAsync(id);
+            try
+            {
+                return await StreamClient.GetStreamAsync(id);
+            }
+            catch (EndpointNotFoundException)
+            {
+                throw new AgentNotFoundException();
+            }
+            catch (SecurityNegotiationException)
+            {
+                throw new BadCredentialsException();
+            }
+            catch (CommunicationObjectFaultedException)
+            {
+                throw new CommunicationFaultedException();
+            }
+
         }
 
         #region IDisposable Support

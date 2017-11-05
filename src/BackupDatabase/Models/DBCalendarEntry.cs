@@ -1,11 +1,10 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Cassandra.Mapping;
 using Cassandra.Mapping.Attributes;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using Newtonsoft.Json;
 
 namespace BackupDatabase.Models
 {
@@ -22,7 +21,7 @@ namespace BackupDatabase.Models
     [Table(Name = "calendar", AllowFiltering = true)]
     public class DBCalendarEntry
     {
-        [JsonProperty("id", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        [JsonProperty("id")]
         [Column("id")]
         [PartitionKey]
         public Guid Id { get; set; }
@@ -33,7 +32,7 @@ namespace BackupDatabase.Models
         [Required]
         public Guid Server { get; set; }
 
-        [JsonProperty("enabled", DefaultValueHandling = DefaultValueHandling.Populate)]
+        [JsonProperty("enabled")]
         [DefaultValue(true)]
         [Column("enabled")]
         [SecondaryIndex]
@@ -44,19 +43,19 @@ namespace BackupDatabase.Models
         [Required]
         public IEnumerable<string> Items { get; set; }
 
-        [JsonProperty("lastrun", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        [JsonProperty("lastrun")]
         [Column("lastrun")]
         public DateTime LastRun { get; set; }
 
-        [JsonProperty("nextrun", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        [JsonProperty("nextrun")]
         [Column("nextrun")]
         public DateTime NextRun { get; set; }
 
-        [JsonProperty("firstrun", DefaultValueHandling = DefaultValueHandling.Ignore)]
+        [JsonProperty("firstrun")]
         [Column("firstrun")]
         public DateTime FirstRun { get; set; }
 
-        [JsonProperty("periodicity", DefaultValueHandling = DefaultValueHandling.Populate)]
+        [JsonProperty("periodicity")]
         [DefaultValue(Periodicity.None)]
         [Column("periodicity", Type = typeof (string))]
         public Periodicity Periodicity { get; set; }
