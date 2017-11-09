@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, withRouter, matchPath } from 'react-router-dom';
+import { Link, matchPath } from 'react-router-dom';
 
 import { connect } from 'react-redux';
 import { logout } from '../Data/actions/auth';
@@ -41,4 +41,4 @@ const mapDispatchToProps = dispatch => {
   };
 };
 
-export default connect(mapStateToProps, mapDispatchToProps)(withRouter(Navbar));
+export default connect(mapStateToProps, mapDispatchToProps)(Navbar);

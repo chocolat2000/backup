@@ -27,9 +27,15 @@ namespace BackupWebAPI.Controllers
         [ValidateModel]
         public async Task<IActionResult> Post([FromBody] DBCalendarEntry calEntry)
         {
-            var entryId = await metaDB.AddCalendarEntry(calEntry);
+            calEntry.Id = await metaDB.AddCalendarEntry(calEntry);
 
-            return NoContent();
+            return Ok(calEntry);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            return Ok(await metaDB.GetCalendarEntries());
         }
 
         [HttpGet("{id:Guid}")]

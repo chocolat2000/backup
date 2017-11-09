@@ -93,9 +93,11 @@ namespace BackupDatabase
 
         Task<DBCalendarEntry> GetCalendarEntry(Guid entry);
 
+        Task<IEnumerable<DBCalendarEntry>> GetCalendarEntries();
+
         Task<IEnumerable<DBCalendarEntry>> GetServerCalendar(Guid server);
 
-        Task<IEnumerable<DBCalendarEntry>> GetNextEntries();
+        Task<IEnumerable<DBCalendarEntry>> GetNextCalendarEntries();
 
     }
 }

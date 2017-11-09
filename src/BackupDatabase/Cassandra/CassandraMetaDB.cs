@@ -396,12 +396,17 @@ namespace BackupDatabase.Cassandra
             return await TblVMDiskBlocks.Where(b => b.VMDisk == diskId && b.Offset < offset).OrderByDescending(b => b.Offset).Select(b => b.Offset).FirstOrDefault().ExecuteAsync().ConfigureAwait(false);
         }
 
+        public async Task<IEnumerable<DBCalendarEntry>> GetCalendarEntries()
+        {
+            return await TblCalendarEntry.ExecuteAsync().ConfigureAwait(false);
+        }
+
         public async Task<IEnumerable<DBCalendarEntry>> GetServerCalendar(Guid server)
         {
             return await TblCalendarEntry.Where(c => c.Server == server).ExecuteAsync().ConfigureAwait(false);
         }
 
-        public async Task<IEnumerable<DBCalendarEntry>> GetNextEntries()
+        public async Task<IEnumerable<DBCalendarEntry>> GetNextCalendarEntries()
         {
             //return await TblCalendarEntry.Where(e => e.NextRun <= DateTime.UtcNow).AllowFiltering().ExecuteAsync().ConfigureAwait(false);
             var mapper = new Mapper(Conn);

@@ -100,7 +100,6 @@ class Windows extends Component {
 
   render() {
     const { name, serverfolders, isFetching } = this.props.server;
-
     const { selecteditems } = this.state;
 
     return (
@@ -122,6 +121,7 @@ class Windows extends Component {
               <div className="tree">
                 <ul>
                   {!isFetching &&
+                    serverfolders &&
                     Object.keys(serverfolders).map(f =>
                       this.renderFolder(f, serverfolders[f])
                     )}

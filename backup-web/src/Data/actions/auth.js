@@ -20,7 +20,7 @@ let refreshTimeout = -1;
       expires
     });  
 
-    var nextRefresh = (expires - Date.now()) / 2;
+    const nextRefresh = (expires - Date.now()) / 2;
     refreshTimeout = setTimeout(refreshAuth, nextRefresh);
   }
 })();
