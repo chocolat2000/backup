@@ -6,6 +6,7 @@ using System.Linq;
 using System.ServiceModel;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Reactive.Linq;
 using Backup.Services;
 using BackupDatabase;
 using BackupDatabase.Models;
@@ -14,13 +15,14 @@ using AgentProxy;
 
 namespace Backup.Runners
 {
-    public class AgentBackup : IBackupServiceCallback
+    public class AgentBackup : IBackupServiceCallback, IDisposable
     {
         private IMetaDBAccess metaDB;
         private WindowsProxy agentProxy;
 
         private BlockingCollection<BackupItem> itemsQueue = new BlockingCollection<BackupItem>(new ConcurrentQueue<BackupItem>());
-        private CancellationTokenSource cancelSource;
+        private CancellationTokenSource ctokenCancelBackup = new CancellationTokenSource();
+        private CancellationToken ctoken;
 
         private BlockSplitter hasher;
         private DBBackup backup;
@@ -35,17 +37,14 @@ namespace Backup.Runners
             backup = null;
         }
 
-        public async Task Run(Guid serverId, string[] items, CancellationTokenSource cancelSource = null)
+        public async Task Run(Guid serverId, string[] items, CancellationToken ctoken)
         {
             if (backup != null)
                 return;
 
-            if (cancelSource == null)
-                this.cancelSource = new CancellationTokenSource();
-            else
-                this.cancelSource = cancelSource;
+            this.ctoken = ctoken;
 
-            var server = await metaDB.GetWindowsServer(serverId);
+            var server = await metaDB.GetWindowsServer(serverId, withcreds: true);
 
             agentProxy = new WindowsProxy(server.Ip, server.Username, server.Password)
             {
@@ -56,95 +55,89 @@ namespace Backup.Runners
             backup.Id = await metaDB.AddBackup(backup);
             backupStatus = Status.Successful;
 
+            IObserver<CancellationTokenSource> observer = default;
+
+            Observable.Interval(TimeSpan.FromSeconds(5)).TakeUntil(
+                Observable.Create<CancellationTokenSource>(o =>
+                {
+                    observer = o;
+                    return () => { };
+                }))
+                .Subscribe(_ =>
+                {
+                    var b = metaDB.GetBackup(backup.Id).GetAwaiter().GetResult();
+                    if (b.Status == Status.Cancelled)
+                    {
+                        ctokenCancelBackup.Cancel();
+                        observer.OnNext(ctokenCancelBackup);
+                    }
+                });
+
             try
             {
                 await agentProxy.Backup(items, backup.Id);
-            }
-            catch (EndpointNotFoundException)
-            {
-                backup.Status = Status.Failed;
-                backup.EndDate = DateTime.Now;
-                backup.AppendLog(string.Format("Cannot connect to server {0} ({1})", server.Name, server.Ip));
-                await metaDB.AddBackup(backup);
-                return;
-            }
 
-           
-            while (true)
-            {
-                BackupItem item = null;
-
-                if (this.cancelSource.IsCancellationRequested)
+                foreach (var item in itemsQueue.GetConsumingEnumerable(ctoken))
                 {
-                    if (itemsQueue.Count > 0)
+                    switch (item.Type)
                     {
-                        item = itemsQueue.Take();
-                    }
-                    else
-                        break;
-                }
-                else
-                {
-                    try
-                    {
-                        item = itemsQueue.Take(this.cancelSource.Token);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        if (itemsQueue.Count > 0)
-                        {
-                            item = itemsQueue.Take();
-                        }
-                        else
+                        case BackupItemType.File:
+                            {
+                                await BackupFile(item);
+                            }
+                            break;
+                        case BackupItemType.Folder:
+                            {
+                                await BackupFolder(item);
+                            }
                             break;
                     }
                 }
 
-                switch (item.Type)
-                {
-                    case BackupItemType.File:
-                        {
-                            await BackupFile(item);
-                        }
-                        break;
-                    case BackupItemType.Folder:
-                        {
-                            await BackupFolder(item);
-                        }
-                        break;
-                }
-
             }
-
-            try
+            catch (EndpointNotFoundException)
             {
-                await agentProxy.BackupComplete(backup.Id);
+                backup.AppendLog($"Cannot connect to server {server.Name} [{server.Ip}]");
+                backupStatus = Status.Failed;
             }
-            catch (Exception)
+            catch (OperationCanceledException)
             {
-
+                backupStatus = Status.Cancelled;
+            }
+            catch (Exception e)
+            {
+                backup.AppendLog($"General Error: {e.Message}");
+                backupStatus = Status.Failed;
             }
             finally
             {
+                try
+                {
+                    await agentProxy.BackupComplete(backup.Id);
+                }
+                catch (Exception) { }
+
                 backup.Status = backupStatus;
                 backup.EndDate = DateTime.Now.ToUniversalTime();
                 await metaDB.AddBackup(backup);
             }
 
-            this.cancelSource.Dispose();
+            Console.WriteLine($"{DateTime.Now} - Backup ended");
+            Console.WriteLine($"{DateTime.Now} - Status: {backup.Status}");
+
             backup = null;
         }
 
-        // WCF Callback implementation
+        private void CheckCancelStatus()
+        {
+            ctoken.ThrowIfCancellationRequested();
+            ctokenCancelBackup.Token.ThrowIfCancellationRequested();
+        }
+
+        #region WCF Callback implementation
         public void SendBackupItem(BackupItem item)
         {
             itemsQueue.Add(item);
-
-        }
-
-        public void BackupCompleted()
-        {
-            cancelSource.Cancel();
         }
 
         public void SendWarningLog(string message)
@@ -152,6 +145,12 @@ namespace Backup.Runners
             backup.AppendLog(message);
             backupStatus = Status.Warning;
         }
+
+        public void SendBackupCompleted()
+        {
+            itemsQueue.CompleteAdding();
+        }
+        #endregion
 
         private async Task BackupFile(BackupItem file)
         {
@@ -171,28 +170,25 @@ namespace Backup.Runners
                 var buffer = new byte[1024 * 64];
                 BlocksManager.dbBlocks = 0;
 
-                Console.WriteLine(DateTime.Now);
-                Console.WriteLine("Backup file : " + file.Name);
+                Console.WriteLine($"{DateTime.Now} - Backup file: {file.Name}");
 
                 IList<byte[]> newbLocks;
-                var readCount = await stream.ReadAsync(buffer, 0, buffer.Length, cancelSource.Token);
+                var readCount = await stream.ReadAsync(buffer, 0, buffer.Length, ctoken);
 
                 while (readCount > 0)
                 {
-                    if(cancelSource.IsCancellationRequested)
-                    {
-                        throw new Exception("Operation Cancelled");
-                    }
+                    CheckCancelStatus();
 
                     newbLocks = hasher.NextBlock(buffer, 0, readCount);
                     foreach (var newbLock in newbLocks)
                     {
+                        CheckCancelStatus();
                         var blockGuid = await BlocksManager.AddBlockToDB(newbLock);
                         await metaDB.AddFileBlock(new DBFileBlock { Block = blockGuid, File = currentFileId, Offset = currentFilePos });
                         currentFilePos += newbLock.Length;
                         totalBlocks++;
                     }
-                    readCount = await stream.ReadAsync(buffer, 0, buffer.Length, cancelSource.Token);
+                    readCount = await stream.ReadAsync(buffer, 0, buffer.Length, ctoken);
                 }
 
                 if (hasher.HasRemainingBytes)
@@ -207,20 +203,21 @@ namespace Backup.Runners
                 dbFile.Valid = true;
                 await metaDB.AddFile(dbFile);
             }
+            catch(OperationCanceledException e)
+            {
+                // re-throws OperationCanceled exceptions
+                throw e;
+            }
             catch (Exception e)
             {
-                backup.AppendLog(string.Format("Error file : {0} --- {1} ", file.Name, e.Message));
+                backup.AppendLog($"Error file: {file.Name} --- {e.Message} ");
                 backupStatus = Status.Warning;
                 await metaDB.AddBackup(backup); // Update backup with error
             }
 
 
-
-            Console.WriteLine(DateTime.Now);
-
-            Console.WriteLine("Total blocks : " + totalBlocks);
-            Console.WriteLine("DB blocks : " + BlocksManager.dbBlocks);
-
+            Console.WriteLine($"{DateTime.Now} - Total blocks: {totalBlocks}");
+            Console.WriteLine($"{DateTime.Now} - DB blocks: {BlocksManager.dbBlocks}");
 
         }
 
@@ -229,6 +226,41 @@ namespace Backup.Runners
         {
             await metaDB.AddFolder(new DBFolder { Name = folder.Name, Backup = backup.Id, LastWriteTime = folder.LastWriteTime });
         }
+
+        #region IDisposable Support
+        private bool disposedValue = false; // To detect redundant calls
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    itemsQueue.Dispose();
+                }
+
+                // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
+                // TODO: set large fields to null.
+
+                disposedValue = true;
+            }
+        }
+
+        // TODO: override a finalizer only if Dispose(bool disposing) above has code to free unmanaged resources.
+        // ~AgentBackup() {
+        //   // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+        //   Dispose(false);
+        // }
+
+        // This code added to correctly implement the disposable pattern.
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+            Dispose(true);
+            // TODO: uncomment the following line if the finalizer is overridden above.
+            // GC.SuppressFinalize(this);
+        }
+        #endregion
 
     }
 

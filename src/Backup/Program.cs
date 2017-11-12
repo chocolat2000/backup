@@ -1,25 +1,34 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Collections;
 using Backup.Runners;
 using BackupDatabase.Models;
 using System.Threading.Tasks;
-using BackupDatabase;
+using Microsoft.Extensions.Configuration;
+using System.Text;
 
 namespace Backup
 {
     public class Program
     {
+        private static IConfiguration Configuration { get; set; }
 
         public static void Main(string[] args)
         {
+            var builder = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json");
+
+            Configuration = builder.Build();
+
             Run(args).GetAwaiter().GetResult();
         }
 
         private static async Task Run(string[] args)
         {
-            using (var metaDB = new BackupDatabase.Cassandra.CassandraMetaDB("127.0.0.1"))
+            using (var metaDB = new BackupDatabase.Cassandra.CassandraMetaDB("127.0.0.1") { PasswordsKey = Encoding.UTF8.GetBytes(Configuration["Encryption:PasswordsKey"]) })
             using (var usersDB = new BackupDatabase.Cassandra.CassandraUsersDB("127.0.0.1"))
             {
                 Console.Write("> ");
@@ -41,8 +50,8 @@ namespace Backup
                                     {
                                         case "agent":
                                             {
-                                                var backup = new AgentBackup(metaDB);
-                                                await backup.Run(new Guid(command[2]), command.Skip(3).ToArray());
+                                                using (var backup = new AgentBackup(metaDB))
+                                                    await backup.Run(new Guid(command[2]), command.Skip(3).ToArray(), new CancellationTokenSource().Token);
                                             }
                                             break;
                                         case "vmware":
@@ -206,7 +215,7 @@ namespace Backup
                                     }
                                     else
                                     {
-                                        switch(command[1])
+                                        switch (command[1])
                                         {
                                             case "add":
                                                 {

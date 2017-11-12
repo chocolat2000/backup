@@ -16,5 +16,10 @@ namespace BackupDatabase.Models
         [Column("block")]
         [ClusteringKey]
         public Guid Block { get; set; }
+
+        [JsonProperty("references")]
+        [Column("references")]
+        [Counter]
+        public long References { get; set; }
     }
 }

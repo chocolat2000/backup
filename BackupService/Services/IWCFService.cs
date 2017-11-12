@@ -41,7 +41,7 @@ namespace BackupService.Services
         void SendWarningLog(string message);
 
         [OperationContract(IsOneWay = true)]
-        void BackupCompleted();
+        void SendBackupCompleted();
     }
 
     [ServiceContract]

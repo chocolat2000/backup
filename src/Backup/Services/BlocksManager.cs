@@ -178,9 +178,8 @@ namespace Backup.Services
                     BlocksManager.dbBlocks++;
                     blockGuid = Guid.NewGuid();
                     await dataDB.WriteBlock(blockGuid, block, length);
-                    await hashesDB.AddHash(blockhash, blockGuid);
                 }
-                await hashesDB.IncReference(blockGuid, blockhash);
+                await hashesDB.AddHash(blockhash, blockGuid);
             }
             catch (Exception e)
             {
@@ -198,6 +197,35 @@ namespace Backup.Services
             return blockGuid;
         }
 
+        /*
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool Equl(byte[] a, byte[] b, int length = -1)
+        {
+            var lgt = length;
+            if (length == -1)
+            {
+                if (a.Length != b.Length)
+                    return false;
+                lgt = a.Length;
+            }
+            else
+            {
+                if (a.Length < length || b.Length < length)
+                    return false;
+            }
+
+            var equal = true;
+            Parallel.For(0, lgt, (i, s) =>
+            {
+                if (a[i] != b[i])
+                {
+                    equal = false;
+                    s.Stop();
+                }
+            });
+            return equal;
+        }
+        */
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool Equl(byte[] a, byte[] b)
         {
@@ -223,6 +251,7 @@ namespace Backup.Services
 
             return true;
         }
+
 
     }
 }

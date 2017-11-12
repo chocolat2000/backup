@@ -65,8 +65,8 @@ namespace AgentProxy
         [System.ServiceModel.OperationContractAttribute(IsOneWay = true, Action = "http://tempuri.org/IBackupService/SendWarningLog")]
         void SendWarningLog(string message);
 
-        [System.ServiceModel.OperationContractAttribute(IsOneWay = true, Action = "http://tempuri.org/IBackupService/BackupCompleted")]
-        void BackupCompleted();
+        [System.ServiceModel.OperationContractAttribute(IsOneWay = true, Action = "http://tempuri.org/IBackupService/SendBackupCompleted")]
+        void SendBackupCompleted();
     }
 
     [System.CodeDom.Compiler.GeneratedCodeAttribute("System.ServiceModel", "4.0.0.0")]

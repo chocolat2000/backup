@@ -261,6 +261,10 @@ namespace BackupDatabase.Cassandra
 
         public async Task<Guid> AddFolder(DBFolder folder)
         {
+            if (folder.Id == Guid.Empty)
+            {
+                folder.Id = Guid.NewGuid();
+            }
             await TblFolder.Insert(folder, false).ExecuteAsync().ConfigureAwait(false);
             return folder.Id;
         }
@@ -408,9 +412,8 @@ namespace BackupDatabase.Cassandra
 
         public async Task<IEnumerable<DBCalendarEntry>> GetNextCalendarEntries()
         {
-            //return await TblCalendarEntry.Where(e => e.NextRun <= DateTime.UtcNow).AllowFiltering().ExecuteAsync().ConfigureAwait(false);
             var mapper = new Mapper(Conn);
-            return await mapper.FetchAsync<DBCalendarEntry>("SELECT * from calendar WHERE enabled=true AND nextrun <= ? ALLOW FILTERING", DateTime.UtcNow);
+            return await mapper.FetchAsync<DBCalendarEntry>($"SELECT * from {TblCalendarEntry.Name} WHERE enabled=true AND nextrun <= ? ALLOW FILTERING", DateTime.UtcNow);
         }
 
         public async Task<ServerType> GetServerType(Guid id)

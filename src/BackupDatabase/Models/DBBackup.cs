@@ -6,7 +6,7 @@ using Newtonsoft.Json.Converters;
 
 namespace BackupDatabase.Models
 {
-    [Table(Name = "dbbackup")]
+    [Table(Name = "backups")]
     public class DBBackup
     {
         [JsonProperty("id")]

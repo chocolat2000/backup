@@ -19,6 +19,7 @@ export const getCalendarEntries = server => dispatch => {
 
 export const backupNow = (server, items) => dispatch => {
   return POST('/api/calendar', {
+    enabled: true,
     server,
     items,
     firstrun: new Date().toISOString(),

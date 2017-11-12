@@ -4,7 +4,7 @@ using Newtonsoft.Json;
 
 namespace BackupDatabase.Models
 {
-    [Table(Name = "file_blocks")]
+    [Table(Name = "files_blocks")]
     public class DBFileBlock
     {
         [JsonProperty("id")]

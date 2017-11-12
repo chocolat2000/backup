@@ -167,12 +167,6 @@ namespace BackupDatabase.Models
                     }
                     break;
                 default: // if no periodicity
-                    // Run now if never run, disable this entry otherwise
-                    if (LastRun < FirstRun)
-                    {
-                        NextRun = now;
-                    }
-                    else
                     {
                         NextRun = DateTime.MaxValue;
                         Enabled = false;

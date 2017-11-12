@@ -5,7 +5,7 @@ using Newtonsoft.Json;
 
 namespace BackupDatabase.Models
 {
-    [Table(Name = "vmdisk_blocks")]
+    [Table(Name = "vmdisks_blocks")]
     public class DBVMDiskBlock
     {
         [JsonProperty("vmdisk")]

@@ -12,8 +12,8 @@ namespace BackupDatabase.Cassandra
     public class CassandraHashesDB : IDBHashes
     {
         private Cluster CasCluster;
-        //private PreparedStatement InsertStatement => Session.Prepare("INSERT INTO hashes (hash, block) VALUES (?, ?)");
-        //private PreparedStatement SelectStatement => Session.Prepare("SELECT block FROM hashes WHERE hash=?");
+        private PreparedStatement IncStatement => Session.Prepare($"UPDATE {TblDBHash.Name } SET references = references + 1 WHERE hash = ? AND block = ?");
+        private PreparedStatement DecStatement => Session.Prepare($"UPDATE {TblDBHash.Name } SET references = references - 1 WHERE hash = ? AND block = ?");
 
         private ISession session = null;
         private ISession Session
@@ -44,6 +44,7 @@ namespace BackupDatabase.Cassandra
             }
         }
 
+        /*
         private Table<DBBlockReferences> tblDBBlockReferences;
         private Table<DBBlockReferences> TblDBBlockReferences
         {
@@ -57,7 +58,7 @@ namespace BackupDatabase.Cassandra
                 return tblDBBlockReferences;
             }
         }
-
+        */
 
 
         public CassandraHashesDB(params string[] addresses)
@@ -65,27 +66,28 @@ namespace BackupDatabase.Cassandra
             CasCluster = Cluster.Builder().AddContactPoints(addresses).Build();
         }
 
+        /*
         public async Task IncReference(Guid block, Guid hash)
         {
-            await TblDBBlockReferences.Where(r => r.Block == block && r.Hash == hash).Select(r => new DBBlockReferences { References = r.References + 1 }).Update().ExecuteAsync().ConfigureAwait(false);
+            //await TblDBBlockReferences.Where(r => r.Block == block && r.Hash == hash).Select(r => new DBBlockReferences { References = r.References + 1 }).Update().ExecuteAsync().ConfigureAwait(false);
+            await Session.ExecuteAsync(IncStatement.Bind(block, hash)).ConfigureAwait(false);
         }
 
         public async Task DecReference(Guid block, Guid hash)
         {
-            await TblDBBlockReferences.Where(r => r.Block == block && r.Hash == hash).Select(r => new DBBlockReferences { References = r.References - 1 }).Update().ExecuteAsync().ConfigureAwait(false);
+            //await TblDBBlockReferences.Where(r => r.Block == block && r.Hash == hash).Select(r => new DBBlockReferences { References = r.References - 1 }).Update().ExecuteAsync().ConfigureAwait(false);
+            await Session.ExecuteAsync(DecStatement.Bind(block, hash)).ConfigureAwait(false);
         }
+        */
 
         public async Task AddHash(Guid hash, Guid block)
         {
-            //await Session.ExecuteAsync(InsertStatement.Bind(hash, block)).ConfigureAwait(false);
-            await TblDBHash.Insert(new DBHash { Hash = hash, Block = block }).ExecuteAsync().ConfigureAwait(false);
+            //await TblDBHash.Insert(new DBHash { Hash = hash, Block = block }).ExecuteAsync().ConfigureAwait(false);
+            await Session.ExecuteAsync(IncStatement.Bind(hash, block)).ConfigureAwait(false);
         }
 
         public async Task<IEnumerable<Guid>> GetBlocksFromHash(Guid hash)
         {
-            //var rowSet = await Session.ExecuteAsync(SelectStatement.Bind(hash)).ConfigureAwait(false);
-            //return rowSet.Select(row => row.GetValue<Guid>("block"));
-
             return await TblDBHash.Where(dbhash => dbhash.Hash == hash).Select(dbhash => dbhash.Block).ExecuteAsync().ConfigureAwait(false);
         }
 

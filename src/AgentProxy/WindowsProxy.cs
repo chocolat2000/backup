@@ -68,19 +68,19 @@ namespace AgentProxy
             {
                 if (streamClient == null)
                 {
-                    var streamTcpBinding = new NetTcpBinding(SecurityMode.Transport)
+                    var streamTcpBinding = new NetTcpBinding//(SecurityMode.Transport)
                     {
                         TransferMode = TransferMode.StreamedResponse,
                         ReceiveTimeout = TimeSpan.FromMinutes(30),
                         SendTimeout = TimeSpan.FromMinutes(30),
                         MaxBufferSize = 65536,
-                        MaxReceivedMessageSize = 10995116277760 // 10To
+                        MaxReceivedMessageSize = int.MaxValue
                     };
 
-                    streamTcpBinding.Security.Transport.ClientCredentialType = TcpClientCredentialType.Windows;
+                    //streamTcpBinding.Security.Transport.ClientCredentialType = TcpClientCredentialType.Windows;
 
                     streamClient = new StreamServiceClient(streamTcpBinding, new EndpointAddress($"net.tcp://{server}:8734/Streaming/"));
-                    streamClient.ClientCredentials.Windows.ClientCredential = networkCredential;
+                    //streamClient.ClientCredentials.Windows.ClientCredential = networkCredential;
                 }
                 return streamClient;
             }

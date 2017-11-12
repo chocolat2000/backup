@@ -50,6 +50,8 @@ namespace BackupService.Services
             this.files = files;
         }
 
+        [OperationBehavior]
+        [PrincipalPermission(SecurityAction.Demand)]
         public void Backup(IEnumerable<string> items, Guid backupId)
         {
             var callback = OperationContext.Current.GetCallbackChannel<IBackupServiceCallback>();
@@ -57,7 +59,7 @@ namespace BackupService.Services
             {
                 SendBackupItem = item => callback.SendBackupItem(item),
                 SendWarningLog = message => callback.SendWarningLog(message),
-                BackupCompleted = () => callback.BackupCompleted()
+                SendBackupComplete = callback.SendBackupCompleted
             };
             backup.Initialize(files);
 
@@ -66,10 +68,11 @@ namespace BackupService.Services
 
         }
 
+        [OperationBehavior]
+        [PrincipalPermission(SecurityAction.Demand)]
         public void BackupComplete(Guid id)
         {
-            BackupCommand backup;
-            if (backups.TryRemove(id, out backup))
+            if (backups.TryRemove(id, out BackupCommand backup))
                 backup.BackupComplete();
         }
     }
@@ -86,10 +89,9 @@ namespace BackupService.Services
 
         public System.IO.Stream GetStream(Guid id)
         {
-            string file;
             System.IO.Stream stream = null;
 
-            if (files.TryRemove(id, out file))
+            if (files.TryRemove(id, out string file))
             {
                 try
                 {
@@ -105,7 +107,10 @@ namespace BackupService.Services
                     throw new FaultException(ex.Message);
                 }
             }
-
+            else
+            {
+                throw new FaultException($"Cannot find stream with id: {id}");
+            }
 
             return stream;
         }

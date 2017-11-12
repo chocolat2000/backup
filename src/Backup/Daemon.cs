@@ -2,6 +2,7 @@
 using BackupDatabase;
 using BackupDatabase.Models;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reactive.Linq;
@@ -24,7 +25,7 @@ namespace Backup
                 started = true;
                 observable = Observable.Interval(TimeSpan.FromSeconds(2));
                 Daemon.database = database;
-                observable.Subscribe(_ => { WakeUp().GetAwaiter().GetResult(); }, ctsource.Token);
+                observable.Subscribe(_ =>  WakeUp(ctsource.Token).GetAwaiter().GetResult(), ctsource.Token);
             }
         }
 
@@ -33,14 +34,13 @@ namespace Backup
             ctsource.Cancel();
         }
 
-        private static async Task WakeUp()
+        private static async Task WakeUp(CancellationToken ctoken)
         {
-            if (ctsource.IsCancellationRequested)
-                return;
+            ctoken.ThrowIfCancellationRequested();
 
             try
             {
-                var tasks = ((await database.GetNextEntries()).Select(calEntry =>
+                var tasks = ((await database.GetNextCalendarEntries()).Select(calEntry =>
                 {
                     Console.WriteLine();
                     Console.WriteLine("-------------------");
@@ -50,16 +50,17 @@ namespace Backup
                     calEntry.UpdateNextRun();
                     return Task.Run(async () =>
                     {
-                        if (ctsource.IsCancellationRequested)
-                            return;
+                        ctoken.ThrowIfCancellationRequested();
 
                         await database.AddCalendarEntry(calEntry);
                         switch (await database.GetServerType(calEntry.Server))
                         {
                             case ServerType.Windows:
                                 {
-                                    var backup = new AgentBackup(database);
-                                    await backup.Run(calEntry.Server, calEntry.Items.ToArray());
+                                    using (var backup = new AgentBackup(database))
+                                    {
+                                        await backup.Run(calEntry.Server, calEntry.Items.ToArray(), ctoken);
+                                    }
                                 }
                                 break;
                             case ServerType.VMware:
@@ -73,15 +74,15 @@ namespace Backup
                                 break;
                         }
 
-                    }, ctsource.Token);
+                    }, ctoken);
 
                 }));
 
                 await Task.WhenAll(tasks.ToArray());
             }
-            catch
+            catch(Exception e)
             {
-                Console.WriteLine("Database error !");
+                Console.WriteLine($"Database error: {e.Message}");
             }
         }
     }

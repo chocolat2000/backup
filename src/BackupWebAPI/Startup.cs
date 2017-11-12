@@ -13,6 +13,8 @@ using Microsoft.IdentityModel.Tokens;
 using BackupDatabase;
 using BackupDatabase.Cassandra;
 using BackupWeb.Services;
+using Microsoft.AspNetCore.ResponseCompression;
+using System.IO.Compression;
 
 namespace BackupWeb
 {
@@ -67,6 +69,8 @@ namespace BackupWeb
             var cassandraUsersDB = new CassandraUsersDB("127.0.0.1");
 
             services.AddMvc();
+            services.AddResponseCompression();
+
             services.AddSingleton<IMetaDBAccess>(cassandraMetaDB);
             services.AddSingleton<IUsersDBAccess>(cassandraUsersDB);
             services.AddSingleton<AgentClient>();
@@ -85,7 +89,7 @@ namespace BackupWeb
                 app.UseExceptionHandler("/api/Exception");
             }
             */
-
+			app.UseResponseCompression();
             app.UseExceptionHandler("/api/Exception");
 
             /*
@@ -98,6 +102,7 @@ namespace BackupWeb
                 // Do logging or other work that doesn't write to the Response.
             });
             */
+			app.UseDefaultFiles();
             app.UseStaticFiles();
             app.UseAuthentication();
 

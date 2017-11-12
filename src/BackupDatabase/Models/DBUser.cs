@@ -5,7 +5,7 @@ using Newtonsoft.Json;
 
 namespace BackupDatabase.Models
 {
-    [Table(Name = "dbuser")]
+    [Table(Name = "users")]
     public class DBUser
     {
         [JsonProperty("login")]

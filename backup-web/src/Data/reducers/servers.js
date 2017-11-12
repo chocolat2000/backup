@@ -31,7 +31,10 @@ const splitName = name => {
   }, []);
 };
 
-const server = (state = { isFetching: false, isUpdating: false, serverfolders: {} }, action) => {
+const server = (
+  state = { isFetching: false, isUpdating: false, serverfolders: {} },
+  action
+) => {
   switch (action.type) {
     case REQUEST_SERVER:
       return Object.assign({}, state, { isFetching: true });
@@ -100,7 +103,7 @@ const servers = (state = { isFetching: false, list: {} }, action) => {
     case REQUEST_SERVERS:
       return Object.assign({}, state, { isFetching: true, list: {} });
     case RECEIVE_SERVERS: {
-      const list = Object.assign(...action.list.map(s => ({ [s.id]: s })));
+      const list = Object.assign({}, ...action.list.map(s => ({ [s.id]: s })));
       return Object.assign({}, state, { isFetching: false, list });
     }
     case REQUEST_SERVER:

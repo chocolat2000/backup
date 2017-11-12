@@ -4,7 +4,7 @@ using Newtonsoft.Json;
 
 namespace BackupDatabase.Models
 {
-    [Table(Name = "block_references")]
+    [Table(Name = "blocks_references")]
     public class DBBlockReferences
     {
         [JsonProperty("block")]

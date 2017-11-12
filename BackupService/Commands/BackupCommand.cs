@@ -18,11 +18,11 @@ namespace BackupService.Commands
 
         public delegate void SendBackupItemCallback(BackupItem item);
         public delegate void SendWarningLogCallback(string message);
-        public delegate void BackupCompletedCallback();
+        public delegate void SendBackupCompleteCallback();
 
         public SendBackupItemCallback SendBackupItem { get; set; }
         public SendWarningLogCallback SendWarningLog { get; set; }
-        public BackupCompletedCallback BackupCompleted { get; set; }
+        public SendBackupCompleteCallback SendBackupComplete { get; set; }
 
         public void Initialize(ConcurrentDictionary<Guid, string> files)
         {
@@ -47,9 +47,7 @@ namespace BackupService.Commands
 
             }
 
-            BackupCompleted();
-
-            
+            SendBackupComplete();
         }
 
         public void BackupComplete()
