@@ -2,9 +2,13 @@
 using System.IO;
 using System.IO.Compression;
 using System.Xml.Serialization;
+using System.Net.Http;
 using System.Linq;
+using System.Net;
+using System.Net.Security;
 using System.Collections.Generic;
 using System.ServiceModel;
+using System.ServiceModel.Channels;
 using System.Threading.Tasks;
 using Vim25Api;
 
@@ -12,28 +16,38 @@ namespace Vim25Proxy
 {
     public class Proxy : IDisposable
     {
-        private BasicHttpsBinding Vim25Binding => new BasicHttpsBinding { MaxReceivedMessageSize = int.MaxValue, MaxBufferPoolSize = int.MaxValue, MaxBufferSize = int.MaxValue, AllowCookies = true };
 
         private UserSession session = null;
         private ServiceContent serviceContent = null;
-        private ManagedObjectReference manager = null;
         private readonly string server;
 
-        private VimPortTypeClient Vim25Client => new VimPortTypeClient(Vim25Binding, new EndpointAddress($"https://{server}/sdk"));
+        private VimPortTypeClient vim25Client = null;
+        private VimPortTypeClient Vim25Client
+        {
+            get
+            {
+                if (vim25Client == null)
+                {
+                    var vim25Binding = new BasicHttpsBinding { MaxReceivedMessageSize = int.MaxValue, MaxBufferPoolSize = int.MaxValue, MaxBufferSize = int.MaxValue, AllowCookies = true };
+                    vim25Client = new VimPortTypeClient(vim25Binding, new EndpointAddress($"https://{server}/sdk"));
+                }
+                return vim25Client;
+            }
+        }
+
+        public bool IsConnected
+        {
+            get
+            {
+                return session != null && Vim25Client.State == CommunicationState.Opened;
+            }
+        }
 
         static Proxy()
         {
-            System.Net.ServicePointManager.ServerCertificateValidationCallback =
-                (sender, certificate, chain, errors) => true;
-
-            /*
-            HttpClientHandler.ServerCertificateCustomValidationCallback =
-                (object sender,
-                System.Security.Cryptography.X509Certificates.X509Certificate certificate,
-                System.Security.Cryptography.X509Certificates.X509Chain chain,
-                System.Net.Security.SslPolicyErrors sslPolicyErrors)
-                => true;
-                */
+            ServicePointManager.ServerCertificateValidationCallback +=
+                new RemoteCertificateValidationCallback((sender, certificate, chain, errors) => { return true; });
+            ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
         }
 
         public Proxy(string server)
@@ -42,10 +56,10 @@ namespace Vim25Proxy
                 throw new ArgumentException("Argument cannot be null or empty", nameof(server));
 
             this.server = server;
-            
+
         }
 
-        public async Task Login(string username, string password)
+        public async Task Login(string username, string password, string locale = null)
         {
             if (string.IsNullOrWhiteSpace(username))
                 throw new ArgumentException("Argument cannot be null or empty", nameof(username));
@@ -59,13 +73,8 @@ namespace Vim25Proxy
                 Value = "ServiceInstance"
             };
 
-            serviceContent = Vim25Client.RetrieveServiceContent(serviceRef);
-            manager = serviceContent.sessionManager;
-
-            session = await Task.Factory.FromAsync(
-                (callback, stateObject) => Vim25Client.BeginLogin(manager, username, password, null, callback, stateObject),
-                Vim25Client.EndLogin, TaskCreationOptions.None);
-
+            serviceContent = await Vim25Client.RetrieveServiceContentAsync(serviceRef);
+            session = await Vim25Client.LoginAsync(serviceContent.sessionManager, username, password, locale);
         }
 
         public async Task Logout()
@@ -73,9 +82,7 @@ namespace Vim25Proxy
             if (session == null)
                 throw new Exception("Not Logged");
 
-            await Task.Factory.FromAsync(
-                (callback, stateObject) => Vim25Client.BeginLogout(manager, callback, stateObject),
-                Vim25Client.EndLogout, TaskCreationOptions.None);
+            await Vim25Client.LogoutAsync(serviceContent.sessionManager);
 
             session = null;
         }
@@ -85,9 +92,7 @@ namespace Vim25Proxy
             if (session == null)
                 throw new Exception("Not Logged");
 
-            var taskRef = await Task.Factory.FromAsync(
-                (callback, stateObject) => Vim25Client.BeginCreateSnapshot_Task(new ManagedObjectReference { type = "VirtualMachine", Value = virtualMachineMoRef }, name, description, memory, quiesce, callback, stateObject),
-                Vim25Client.EndCreateSnapshot_Task, TaskCreationOptions.None);
+            var taskRef = await Vim25Client.CreateSnapshot_TaskAsync(new ManagedObjectReference { type = "VirtualMachine", Value = virtualMachineMoRef }, name, description, memory, quiesce);
 
             var taskInfo = await WaitForTaskEnd(taskRef.Value);
             if (taskInfo.state != TaskInfoState.success)
@@ -101,9 +106,7 @@ namespace Vim25Proxy
             if (session == null)
                 throw new Exception("Not Logged");
 
-            var taskRef = await Task.Factory.FromAsync(
-                (callback, stateObject) => Vim25Client.BeginRemoveSnapshot_Task(new ManagedObjectReference { type = "VirtualMachineSnapshot", Value = snapshotMoRef }, removeChildren, consolidate, callback, stateObject),
-                Vim25Client.EndRemoveSnapshot_Task, TaskCreationOptions.None);
+            var taskRef = await Vim25Client.RemoveSnapshot_TaskAsync(new ManagedObjectReference { type = "VirtualMachineSnapshot", Value = snapshotMoRef }, removeChildren, consolidate);
 
             var taskInfo = await WaitForTaskEnd(taskRef.Value);
             if (taskInfo.state != TaskInfoState.success)
@@ -123,11 +126,9 @@ namespace Vim25Proxy
                 propSet = new PropertySpec[] { propertySpecSnap },
                 objectSet = new ObjectSpec[] { new ObjectSpec() { obj = new ManagedObjectReference { type = "VirtualMachineSnapshot", Value = snapshotMoRef } } }
             };
-            var snapProps = await Task.Factory.FromAsync(
-                            (callback, stateObject) => Vim25Client.BeginRetrieveProperties(serviceContent.propertyCollector, new PropertyFilterSpec[] { propertyFilterSpecSnap }, callback, stateObject),
-                            Vim25Client.EndRetrieveProperties, TaskCreationOptions.None);
+            var snapProps = await Vim25Client.RetrievePropertiesAsync(serviceContent.propertyCollector, new PropertyFilterSpec[] { propertyFilterSpecSnap });
 
-            return snapProps[0].propSet.FirstOrDefault(p => p.name == "config")?.val as VirtualMachineConfigInfo;
+            return snapProps.returnval[0].propSet.FirstOrDefault(p => p.name == "config")?.val as VirtualMachineConfigInfo;
 
         }
 
@@ -200,12 +201,10 @@ namespace Vim25Proxy
             if (session == null)
                 throw new Exception("Not Logged");
 
-            var diskChangeInfo = await Task.Factory.FromAsync(
-                (callback, stateObject) => Vim25Client.BeginQueryChangedDiskAreas(
+            var diskChangeInfo = await Vim25Client.QueryChangedDiskAreasAsync(
                     new ManagedObjectReference { type = "VirtualMachine", Value = vmMoRef },
                     new ManagedObjectReference { type = "VirtualMachineSnapshot", Value = snapshotMoRef },
-                    diskKey, startOffset, changeId, callback, stateObject),
-                Vim25Client.EndQueryChangedDiskAreas, TaskCreationOptions.None);
+                    diskKey, startOffset, changeId);
 
             return diskChangeInfo.changedArea.OrderBy(change => change.start).Select(change => (change.start, change.length));
         }
@@ -226,10 +225,8 @@ namespace Vim25Proxy
                 objectSet = new ObjectSpec[] { new ObjectSpec() { obj = new ManagedObjectReference { type = "VirtualMachine", Value = vmMoRef } } }
             };
 
-            var vmPowerStateReq = await Task.Factory.FromAsync(
-                            (callback, stateObject) => Vim25Client.BeginRetrieveProperties(serviceContent.propertyCollector, new PropertyFilterSpec[] { propertyFilterSpec }, callback, stateObject),
-                            Vim25Client.EndRetrieveProperties, TaskCreationOptions.None);
-            return (VirtualMachinePowerState)vmPowerStateReq[0].propSet.FirstOrDefault(p => p.name == "runtime.powerState")?.val;
+            var vmPowerStateReq = await Vim25Client.RetrievePropertiesAsync(serviceContent.propertyCollector, new PropertyFilterSpec[] { propertyFilterSpec });
+            return (VirtualMachinePowerState)vmPowerStateReq.returnval[0].propSet.FirstOrDefault(p => p.name == "runtime.powerState")?.val;
 
         }
 
@@ -249,11 +246,9 @@ namespace Vim25Proxy
                 objectSet = new ObjectSpec[] { new ObjectSpec() { obj = new ManagedObjectReference { type = "VirtualMachine", Value = vmMoRef } } }
             };
 
-            var vmPowerStateReq = await Task.Factory.FromAsync(
-                            (callback, stateObject) => Vim25Client.BeginRetrieveProperties(serviceContent.propertyCollector, new PropertyFilterSpec[] { propertyFilterSpec }, callback, stateObject),
-                            Vim25Client.EndRetrieveProperties, TaskCreationOptions.None);
-            var changeTrackingEnabled = (bool)vmPowerStateReq[0].propSet.FirstOrDefault(p => p.name == "config.changeTrackingEnabled")?.val;
-            var changeTrackingSupported = (bool)vmPowerStateReq[0].propSet.FirstOrDefault(p => p.name == "capability.changeTrackingSupported")?.val;
+            var vmPowerStateReq = await Vim25Client.RetrievePropertiesAsync(serviceContent.propertyCollector, new PropertyFilterSpec[] { propertyFilterSpec });
+            var changeTrackingEnabled = (bool)vmPowerStateReq.returnval[0].propSet.FirstOrDefault(p => p.name == "config.changeTrackingEnabled")?.val;
+            var changeTrackingSupported = (bool)vmPowerStateReq.returnval[0].propSet.FirstOrDefault(p => p.name == "capability.changeTrackingSupported")?.val;
 
             return (changeTrackingEnabled, changeTrackingSupported);
 
@@ -264,12 +259,9 @@ namespace Vim25Proxy
             if (session == null)
                 throw new Exception("Not Logged");
 
-            var taskRef = await Task.Factory.FromAsync(
-                (callback, stateObject) => Vim25Client.BeginReconfigVM_Task(
+            var taskRef = await Vim25Client.ReconfigVM_TaskAsync(
                     new ManagedObjectReference { type = "VirtualMachine", Value = vmMoRef },
-                    new VirtualMachineConfigSpec { changeTrackingEnabled = true },
-                    callback, stateObject),
-                Vim25Client.EndReconfigVM_Task, TaskCreationOptions.None);
+                    new VirtualMachineConfigSpec { changeTrackingEnabled = true });
 
             var configTaskInfo = await WaitForTaskEnd(taskRef.Value);
 
@@ -284,8 +276,6 @@ namespace Vim25Proxy
         {
             if (session == null)
                 throw new Exception("Not Logged");
-
-            var rootFolder = serviceContent.rootFolder;
 
             ////////////////////////////////////////////////////////
 
@@ -304,10 +294,12 @@ namespace Vim25Proxy
                 selectSet = new SelectionSpec[] { new SelectionSpec() { name = "folderTSpec" }, dc2vmFolder }
             };
 
-            var ospec = new ObjectSpec();
-            ospec.obj = rootFolder;
-            ospec.skip = false;
-            ospec.selectSet = new SelectionSpec[] { folderTS };
+            var ospec = new ObjectSpec
+            {
+                obj = serviceContent.rootFolder,
+                skip = false,
+                selectSet = new SelectionSpec[] { folderTS }
+            };
 
             /////////////////////////////////////////////
 
@@ -320,25 +312,13 @@ namespace Vim25Proxy
 
             ////////////////////////////////////////////
 
-            var propertyCollector = serviceContent.propertyCollector;
             var fs = new PropertyFilterSpec { objectSet = new ObjectSpec[] { ospec }, propSet = new PropertySpec[] { vmSp } };
 
-            var pFilter = await Task.Factory.FromAsync(
-                (callback, stateObject) => Vim25Client.BeginCreateFilter(propertyCollector, fs, false, callback, stateObject),
-                Vim25Client.EndCreateFilter, TaskCreationOptions.None);
-            var changeData = await Task.Factory.FromAsync(
-                (callback, stateObject) => Vim25Client.BeginCheckForUpdates(propertyCollector, "", callback, stateObject),
-                Vim25Client.EndCheckForUpdates, TaskCreationOptions.None);
+            var vmProps = await Vim25Client.RetrievePropertiesAsync(serviceContent.propertyCollector, new PropertyFilterSpec[] { fs });
 
-            await Task.Factory.FromAsync(
-                (callback, stateObject) => Vim25Client.BeginLogout(manager, callback, stateObject),
-                Vim25Client.EndLogout, TaskCreationOptions.None);
-
-            return changeData.filterSet[0].objectSet
-                .ToDictionary(
-                obj => obj.obj.Value,
-                obj => (string)obj.changeSet[0].val);
-
+            return vmProps.returnval
+                .OrderBy(obj => (string)obj.propSet[0].val)
+                .ToDictionary(obj => obj.obj.Value, obj => (string)obj.propSet[0].val);
         }
 
         private async Task<TaskInfo> WaitForTaskEnd(string taskMoRef)
@@ -354,17 +334,15 @@ namespace Vim25Proxy
             var propertyFilterSpecTask = new PropertyFilterSpec
             {
                 propSet = new PropertySpec[] { propertySpecTask },
-                objectSet = new ObjectSpec[] { new ObjectSpec() { obj = new ManagedObjectReference { type = "Task", Value = taskMoRef } } }
+                objectSet = new ObjectSpec[] { new ObjectSpec { obj = new ManagedObjectReference { type = "Task", Value = taskMoRef } } }
             };
 
             TaskInfo configTaskInfo;
             do
             {
                 await Task.Delay(2000);
-                var taskProps = await Task.Factory.FromAsync(
-                                (callback, stateObject) => Vim25Client.BeginRetrieveProperties(serviceContent.propertyCollector, new PropertyFilterSpec[] { propertyFilterSpecTask }, callback, stateObject),
-                                Vim25Client.EndRetrieveProperties, TaskCreationOptions.None);
-                configTaskInfo = taskProps[0].propSet[0].val as TaskInfo;
+                var taskProps = await Vim25Client.RetrievePropertiesAsync(serviceContent.propertyCollector, new PropertyFilterSpec[] { propertyFilterSpecTask });
+                configTaskInfo = taskProps.returnval[0].propSet[0].val as TaskInfo;
             } while (configTaskInfo?.state == TaskInfoState.running);
 
             return configTaskInfo;

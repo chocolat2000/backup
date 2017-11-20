@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 using BackupDatabase.Models;
 using Cassandra;
@@ -387,7 +388,7 @@ namespace BackupDatabase.Cassandra
 
         public async Task<DBVMwareVM> GetLatestVM(Guid server, string vmMoref)
         {
-            return await TblVMwareVM.Where(vm => vm.Server == server && vm.Moref == vmMoref).FirstOrDefault().ExecuteAsync().ConfigureAwait(false);
+            return await TblVMwareVM.Where(vm => vm.Server == server && vm.Moref == vmMoref && vm.Valid == true ).FirstOrDefault().ExecuteAsync().ConfigureAwait(false);
         }
 
         public async Task<long> GetNextVMDiskOffset(Guid diskId, long offset)

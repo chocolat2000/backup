@@ -6,7 +6,7 @@
 
   <ItemGroup>
     <PackageReference Include="System.ServiceModel.Http" Version="4.4.0" />
-    <PackageReference Include="VimService" Version="1.0.0" />
+    <PackageReference Include="VimService" Version="3.0.0" />
   </ItemGroup>
 
 </Project>

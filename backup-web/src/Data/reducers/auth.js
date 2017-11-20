@@ -1,15 +1,23 @@
-import {
-  BEGIN_LOGIN,
-  SUCCESS_LOGIN,
-  ERROR_LOGIN,
-  END_LOGIN
-} from '../actions/auth';
+// @flow
 
-const auth = (state = { inProgress: false, status: 'unlogged' }, action) => {
-  switch (action.type) {
-    case BEGIN_LOGIN:
+import type { LogguedStatus, ActionType, Action } from '../actions/auth';
+
+type State = {
+  +inProgress: boolean,
+  +status: LogguedStatus,
+  +token?: string,
+  +error?: string,
+  +expires?: Date
+};
+
+const auth = (
+  state: State = { inProgress: false, status: 'unlogged' },
+  action: Action
+): State => {
+  switch ((action.type: ActionType)) {
+    case 'BEGIN_LOGIN':
       return { inProgress: true, status: 'unlogged', error: '' };
-    case SUCCESS_LOGIN: {
+    case 'SUCCESS_LOGIN': {
       const { token, expires } = action;
       return {
         inProgress: false,
@@ -18,11 +26,11 @@ const auth = (state = { inProgress: false, status: 'unlogged' }, action) => {
         expires
       };
     }
-    case ERROR_LOGIN: {
+    case 'ERROR_LOGIN': {
       const { error } = action;
-      return { inProgress: false, error };
+      return { inProgress: false, status: 'unlogged', error };
     }
-    case END_LOGIN: {
+    case 'END_LOGIN': {
       return { inProgress: false, status: 'unlogged' };
     }
     default:

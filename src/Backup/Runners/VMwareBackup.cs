@@ -6,6 +6,7 @@ using System.Linq;
 using System.Collections.Generic;
 using System.ServiceModel;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Backup.Services.VDDK;
 using System.Xml.Serialization;
@@ -15,12 +16,11 @@ using Vim25Proxy;
 
 namespace Backup.Runners
 {
-    public class VMwareBackup
+    public class VMwareBackup : BackupRunner
     {
         private IMetaDBAccess metaDB;
 
         private BlockSplitter hasher;
-        private DBBackup backup = null;
 
         private Proxy vim25Proxy = null;
 
@@ -48,32 +48,14 @@ namespace Backup.Runners
             hasher = new BlockSplitter();
         }
 
-        public async Task Run(Guid serverId, string vmMoref = null)
+        public async Task Run(Guid serverId, string vmMoref = null, CancellationToken ctoken = default)
         {
             if (backup != null)
                 return;
 
-            Server = await metaDB.GetVMWareServer(serverId);
+            this.ctoken = ctoken;
 
-            if (vmMoref == null)
-            {
-                int selected = -1;
-                var vmList = (await vim25Proxy.GetVMs()).OrderBy(kv => kv.Value).ToArray();
-                do
-                {
-                    var i = 1;
-                    foreach (var kv in vmList)
-                    {
-                        Console.WriteLine("{0}\t{1}", i++, kv.Value);
-                    }
-                    Console.WriteLine("Choose a VM: ");
-                    if (!int.TryParse(Console.ReadLine(), out selected) || selected < 1 || selected > vmList.Length)
-                    {
-                        selected = -1;
-                    }
-                } while (selected < 1);
-                vmMoref = vmList[selected - 1].Key;
-            }
+            Server = await metaDB.GetVMWareServer(serverId, true);
 
             backup = new DBBackup { Server = serverId, StartDate = DateTime.UtcNow, Status = Status.Running, Log = new List<string>() };
             backup.Id = await metaDB.AddBackup(backup);
@@ -81,11 +63,34 @@ namespace Backup.Runners
             var vmBackup = new DBVMwareVM { Backup = backup.Id, Moref = vmMoref, StartDate = DateTime.UtcNow, Valid = false, Server = Server.Id };
             vmBackup.Id = await metaDB.AddVMwareVM(vmBackup);
 
+            var snapRef = string.Empty;
+
             try
             {
 
                 vim25Proxy = new Proxy(Server.Ip);
                 await vim25Proxy.Login(Server.Username, Server.Password);
+                if (vmMoref == null)
+                {
+                    int selected = -1;
+                    var vmList = (await vim25Proxy.GetVMs()).OrderBy(kv => kv.Value).ToArray();
+                    do
+                    {
+                        var i = 1;
+                        foreach (var kv in vmList)
+                        {
+                            Console.WriteLine("{0}\t{1}", i++, kv.Value);
+                        }
+                        Console.WriteLine("Choose a VM: ");
+                        if (!int.TryParse(Console.ReadLine(), out selected) || selected < 1 || selected > vmList.Length)
+                        {
+                            selected = -1;
+                        }
+                    } while (selected < 1);
+                    vmMoref = vmList[selected - 1].Key;
+                }
+
+                CheckCancelStatus();
 
                 // Retrieve backup vm info, usefull for backup type
                 var vmPowerState = await vim25Proxy.GetVMPowerState(vmMoref);
@@ -99,12 +104,12 @@ namespace Backup.Runners
                 }
 
                 // Create backup snapshot
-                var snapRef = await vim25Proxy.CreateSnapshot(
+                snapRef = await vim25Proxy.CreateSnapshot(
                         vmMoref, "BerBackup", $"Backup started at {DateTime.Now}",
                         false, vmPowerState == VirtualMachinePowerState.poweredOn);
 
                 // Retrieve full vm config from Snapshot
-                var vmConfig = vim25Proxy.GetVMConfigFromSnapshot(snapRef);
+                var vmConfig = await vim25Proxy.GetVMConfigFromSnapshot(snapRef);
 
                 vmBackup.Name = vim25Proxy.GetVMConfigParameter(vmConfig, "name") as string;
 
@@ -115,8 +120,8 @@ namespace Backup.Runners
                 var previousVMBackup = changeTrackingEnabled ? await metaDB.GetLatestVM(serverId, vmMoref) : null;
 
                 // Initialize VDDK stuff
-                Environment.SetEnvironmentVariable("PATH", @"C:\Users\bdoneux\Documents\Visual Studio 2017\Projects\Backup\x64\Debug;D:\VMware-vix-disklib-6.5.2-6195444.x86_64\bin;%PATH%");
-                var status = VixDiskLib.VixDiskLib_Init(6, 0, null, null, null, @"D:\VMware-vix-disklib-6.5.2-6195444.x86_64");
+                Environment.SetEnvironmentVariable("PATH", @"C:\Users\bdoneux\source\repos\Backup\x64\Debug;D:\VMware-vix-disklib-6.5.2-6195444.x86_64\bin;%PATH%");
+                var status = VixDiskLib.VixDiskLib_InitEx(6, 0, null, null, null, @"D:\VMware-vix-disklib-6.5.2-6195444.x86_64", null);
 
                 var connectParams = new VixDiskLibConnectParams
                 {
@@ -164,7 +169,7 @@ namespace Backup.Runners
                         previousChangeId = previousDisk.ChangeId;
                         await metaDB.CopyVMDiskBlocks(previousDisk.VM, dbDisk.Id);
                     }
-                    
+
                     long bytestart = 0;
                     long bytelength = 0;
                     ulong iterations;
@@ -195,7 +200,7 @@ namespace Backup.Runners
                             }
 
                             var _byteend = await metaDB.GetNextVMDiskOffset(dbDisk.VM, start + length);
-                            if (_byteend > -1)
+                            if (_byteend > 0)
                             {
                                 bytelength = _byteend - bytestart;
                             }
@@ -286,7 +291,7 @@ namespace Backup.Runners
                                     }
                                 }
 
-                                if(startsector >= diskSizeInSectors && hasher.HasRemainingBytes)
+                                if (startsector >= diskSizeInSectors && hasher.HasRemainingBytes)
                                 {
                                     var block = hasher.RemainingBytes();
                                     var blockGuid = await BlocksManager.AddBlockToDB(block);
@@ -327,9 +332,6 @@ namespace Backup.Runners
                 vmBackup.Valid = true;
                 await metaDB.AddVMwareVM(vmBackup);
 
-                await vim25Proxy.RemoveSnapshot(snapRef, false, true);
-                await vim25Proxy.Logout();
-
             }
             catch (Exception e)
             {
@@ -337,7 +339,15 @@ namespace Backup.Runners
                 backup.AppendLog(e.Message);
                 backup.Status = Status.Failed;
             }
-
+            finally
+            {
+                if (vim25Proxy.IsConnected)
+                {
+                    if (snapRef != string.Empty)
+                        await vim25Proxy.RemoveSnapshot(snapRef, false, true);
+                    await vim25Proxy.Logout();
+                }
+            }
             vmBackup.EndDate = DateTime.UtcNow;
             await metaDB.AddVMwareVM(vmBackup);
 
@@ -345,6 +355,42 @@ namespace Backup.Runners
             await metaDB.AddBackup(backup);
 
         }
+
+        #region IDisposable Support
+        private bool disposedValue = false; // To detect redundant calls
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    vim25Proxy?.Dispose();
+                }
+
+                // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
+                // TODO: set large fields to null.
+
+                disposedValue = true;
+            }
+        }
+
+        // TODO: override a finalizer only if Dispose(bool disposing) above has code to free unmanaged resources.
+        // ~AgentBackup() {
+        //   // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+        //   Dispose(false);
+        // }
+
+        // This code added to correctly implement the disposable pattern.
+        public override void Dispose()
+        {
+            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+            Dispose(true);
+            // TODO: uncomment the following line if the finalizer is overridden above.
+            // GC.SuppressFinalize(this);
+        }
+        #endregion
+
 
     }
 }

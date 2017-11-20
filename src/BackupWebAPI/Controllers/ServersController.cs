@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -10,6 +11,7 @@ using BackupWeb.Services;
 using Microsoft.AspNetCore.Authorization;
 using BackupWebAPI.Filters;
 using Newtonsoft.Json.Linq;
+using System.Security.Cryptography.X509Certificates;
 
 namespace BackupWeb.Controllers
 {
@@ -74,8 +76,10 @@ namespace BackupWeb.Controllers
                         {
                             var vmserver = server as DBVMwareServer;
                             await proxy.Login(vmserver.Username, vmserver.Password);
+                            vmserver.Username = null;
+                            vmserver.Password = null;
                             vmserver.VMs = await proxy.GetVMs();
-                            await metaDB.AddServer(vmserver);
+                            await metaDB.UpdateServer(vmserver);
                         }
                         break;
                 }
@@ -118,6 +122,16 @@ namespace BackupWeb.Controllers
         [ValidateModel]
         public async Task<IActionResult> AddVMwareServer([FromBody] DBVMwareServer server)
         {
+            var request = WebRequest.CreateHttp($"https://{server.Ip}");
+            request.ServerCertificateValidationCallback += 
+                (sender, certificate, chain, sslPolicyErrors) => 
+                {
+                    var cert2 = new X509Certificate2(certificate);
+                    server.ThumbPrint = cert2.Thumbprint;
+                    return true;
+                };
+            (await request.GetResponseAsync()).Close();
+
             return Ok(await metaDB.AddServer(server));
         }
 

@@ -1,13 +1,24 @@
-//import objectAssignDeep from 'object-assign-deep';
-import { REQUEST_BACKUPS, RECEIVE_BACKUPS } from '../actions/backups';
+// @flow
 
-const backups = (state = { isFetching: false, list: {} }, action) => {
-  switch (action.type) {
-    case REQUEST_BACKUPS: {
-      return Object.assign({}, state, { isFetching: true, list: {} });
+import type { ActionType, Action } from '../actions/backups';
+
+import type { Backup } from '../store';
+
+type State = {
+  +isFetching: boolean,
+  +list: Array<Backup>
+};
+
+const backups = (
+  state: State = { isFetching: false, list: [] },
+  action: Action
+) => {
+  switch ((action.type: ActionType)) {
+    case 'REQUEST_BACKUPS': {
+      return { isFetching: true, list: [{}] };
     }
-    case RECEIVE_BACKUPS: {
-      return Object.assign({}, state, { isFetching: false, list: action.list });
+    case 'RECEIVE_BACKUPS': {
+      return { isFetching: false, list: action.list };
     }
     default:
       return state;

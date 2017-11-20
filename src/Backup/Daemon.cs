@@ -68,7 +68,7 @@ namespace Backup
                                     await Task.WhenAll(calEntry.Items.Select(vm =>
                                     {
                                         var backup = new VMwareBackup(database);
-                                        return backup.Run(calEntry.Server, vm);
+                                        return backup.Run(calEntry.Server, vm, ctoken);
                                     }).ToArray());
                                 }
                                 break;

@@ -1,71 +1,101 @@
+// @flow
+
 import { setAuthorizationHeader, GET, POST, PUT, DELETE } from '../requester';
+import type { Dispatch } from 'redux';
+
 import store from '../store';
 
-export const BEGIN_LOGIN = 'BEGIN_LOGIN';
-export const SUCCESS_LOGIN = 'SUCCESS_LOGIN';
-export const ERROR_LOGIN = 'ERROR_LOGIN';
-export const END_LOGIN = 'END_LOGIN';
+export type LogguedStatus = 'loggued' | 'unlogged';
 
-let refreshTimeout = -1;
+export type ActionType =
+  | 'BEGIN_LOGIN'
+  | 'SUCCESS_LOGIN'
+  | 'ERROR_LOGIN'
+  | 'END_LOGIN';
+
+export type BEGIN_LOGIN_Action = { type: 'BEGIN_LOGIN' };
+export type SUCCESS_LOGIN_Action = {
+  type: 'SUCCESS_LOGIN',
+  token: string,
+  expires: Date
+};
+export type ERROR_LOGIN_Action = { type: 'ERROR_LOGIN', error: string };
+export type END_LOGIN_Action = { type: 'END_LOGIN' };
+
+export type Action =
+  | BEGIN_LOGIN_Action
+  | SUCCESS_LOGIN_Action
+  | ERROR_LOGIN_Action
+  | END_LOGIN_Action;
+
+let refreshTimeout: number = -1;
 
 (() => {
-  const token = sessionStorage.getItem('jwtData');
-  const expires = new Date(sessionStorage.getItem('jwtExpires'));
-  if (token !== null && expires > Date.now()) {
+  const token: ?string = sessionStorage.getItem('jwtData');
+  const date: ?string = sessionStorage.getItem('jwtExpires');
+  if (!(token && date)) return;
+
+  const expires: Date = new Date(date);
+  if (expires > Date.now()) {
     setAuthorizationHeader(`Bearer ${token}`);
 
     store.dispatch({
-      type: SUCCESS_LOGIN,
+      type: 'SUCCESS_LOGIN',
       token,
       expires
-    });  
+    });
 
-    const nextRefresh = (expires - Date.now()) / 2;
+    const nextRefresh: number = (expires - Date.now()) / 2;
     refreshTimeout = setTimeout(refreshAuth, nextRefresh);
   }
 })();
 
-export const login = (username, password) => dispatch => {
-  dispatch({ type: BEGIN_LOGIN });
+export const login = (username: string, password: string) => (
+  dispatch: Dispatch<BEGIN_LOGIN_Action>
+): Promise<void> => {
+  dispatch({ type: 'BEGIN_LOGIN' });
   return POST('/api/auth/login', {
     login: username,
     password: password
   }).then(handleAuthResponse, handleErrorLogin);
 };
 
-export const logout = () => dispatch => {
+export const logout = () => (dispatch: Dispatch<END_LOGIN_Action>): void => {
   setAuthorizationHeader(null);
   sessionStorage.removeItem('jwtData');
   sessionStorage.removeItem('jwtExpires');
   if (refreshTimeout > -1) clearTimeout(refreshTimeout);
-  dispatch({ type: END_LOGIN });
+  dispatch({ type: 'END_LOGIN' });
 };
 
-const refreshAuth = () => {
-  GET('/api/auth/refresh').then(
-    handleAuthResponse,
-    handleErrorLogin
-  );
+const refreshAuth = (): void => {
+  GET('/api/auth/refresh').then(handleAuthResponse, handleErrorLogin);
 };
 
-const handleAuthResponse = ({ token, expires }) => {
+const handleAuthResponse = ({
+  token,
+  expires
+}: {
+  token: string,
+  expires: string
+}): void => {
   setAuthorizationHeader(`Bearer ${token}`);
   sessionStorage.setItem('jwtData', token);
   sessionStorage.setItem('jwtExpires', expires);
 
   store.dispatch({
-    type: SUCCESS_LOGIN,
+    type: 'SUCCESS_LOGIN',
     token,
-    expires
+    expires: new Date(expires)
   });
 
-  const nextRefresh = (new Date(expires) - Date.now()) / 2;
+  const nextRefresh: number = (new Date(expires) - Date.now()) / 2;
   refreshTimeout = setTimeout(refreshAuth, nextRefresh);
 };
 
-const handleErrorLogin = error => {
+const handleErrorLogin = (error: string): void => {
   store.dispatch({
-    type: ERROR_LOGIN,
+    type: 'ERROR_LOGIN',
     error
   });
 };

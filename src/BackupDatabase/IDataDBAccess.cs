@@ -6,7 +6,6 @@ namespace BackupDatabase
     public interface IDataDBAccess
     {
         Task<byte[]> ReadBlock(Guid id);
-        Task WriteBlock(Guid id, byte[] data);
-        Task WriteBlock(Guid id, byte[] data, int length);
+        Task WriteBlock(Guid id, byte[] data, int length = -1);
     }
 }

@@ -45,17 +45,12 @@ namespace BackupDatabase.FileSystem
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Task WriteBlock(Guid id, byte[] data)
-        {
-            return WriteBlock(id, data, data.Length);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public async Task WriteBlock(Guid id, byte[] data, int length)
+        public async Task WriteBlock(Guid id, byte[] data, int length = -1)
         {
             var guidArray = id.ToString();
-            var blockFileName = $@"{BACKUP_FOLDER}\{guidArray[0]}\{guidArray[1]}\{guidArray[2]}\{guidArray[3]}\{guidArray[4]}\{guidArray}";
-            Directory.CreateDirectory(Path.GetDirectoryName(blockFileName));
+            var directory = $@"{BACKUP_FOLDER}\{guidArray[0]}\{guidArray[1]}\{guidArray[2]}\{guidArray[3]}\{guidArray[4]}";
+            var blockFileName = $@"{directory}\{guidArray}";
+            Directory.CreateDirectory(directory);
             using (
                 var fs = new FileStream(
                     blockFileName,
@@ -64,7 +59,6 @@ namespace BackupDatabase.FileSystem
                 )
             {
                 await fs.WriteAsync(data, 0, length < 0 || length > data.Length ? data.Length : length);
-                await fs.FlushAsync();
             }
 
         }

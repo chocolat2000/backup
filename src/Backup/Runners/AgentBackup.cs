@@ -15,17 +15,14 @@ using AgentProxy;
 
 namespace Backup.Runners
 {
-    public class AgentBackup : IBackupServiceCallback, IDisposable
+    public class AgentBackup : BackupRunner, IBackupServiceCallback
     {
         private IMetaDBAccess metaDB;
         private WindowsProxy agentProxy;
 
         private BlockingCollection<BackupItem> itemsQueue = new BlockingCollection<BackupItem>(new ConcurrentQueue<BackupItem>());
-        private CancellationTokenSource ctokenCancelBackup = new CancellationTokenSource();
-        private CancellationToken ctoken;
 
         private BlockSplitter hasher;
-        private DBBackup backup;
         private Status backupStatus;
         private Guid currentFileId;
 
@@ -37,7 +34,7 @@ namespace Backup.Runners
             backup = null;
         }
 
-        public async Task Run(Guid serverId, string[] items, CancellationToken ctoken)
+        public async Task Run(Guid serverId, string[] items, CancellationToken ctoken = default)
         {
             if (backup != null)
                 return;
@@ -126,12 +123,6 @@ namespace Backup.Runners
             Console.WriteLine($"{DateTime.Now} - Status: {backup.Status}");
 
             backup = null;
-        }
-
-        private void CheckCancelStatus()
-        {
-            ctoken.ThrowIfCancellationRequested();
-            ctokenCancelBackup.Token.ThrowIfCancellationRequested();
         }
 
         #region WCF Callback implementation
@@ -237,6 +228,7 @@ namespace Backup.Runners
                 if (disposing)
                 {
                     itemsQueue.Dispose();
+                    agentProxy?.Dispose();
                 }
 
                 // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
@@ -253,7 +245,7 @@ namespace Backup.Runners
         // }
 
         // This code added to correctly implement the disposable pattern.
-        public void Dispose()
+        public override void Dispose()
         {
             // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
             Dispose(true);

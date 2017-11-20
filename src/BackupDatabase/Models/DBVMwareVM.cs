@@ -18,7 +18,7 @@ namespace BackupDatabase.Models
 
         [JsonProperty("moref")]
         [Column("moref")]
-        [SecondaryIndex]
+        [PartitionKey(0)]
         public string Moref { get; set; }
 
         [JsonProperty("config")]
@@ -27,21 +27,22 @@ namespace BackupDatabase.Models
 
         [JsonProperty("backup")]
         [Column("backup")]
-        [PartitionKey]
+        [SecondaryIndex]
         public Guid Backup { get; set; }
 
         [JsonProperty("server")]
         [Column("server")]
-        [SecondaryIndex]
+        [PartitionKey(0)]
         public Guid Server { get; set; }
 
         [JsonProperty("valid")]
         [Column("valid")]
+        [ClusteringKey(0, SortOrder.Ascending)]
         public bool Valid { get; set; }
 
         [JsonProperty("startdate")]
         [Column("startdate")]
-        [ClusteringKey(0, ClusteringSortOrder = SortOrder.Descending)]
+        [ClusteringKey(1, SortOrder.Descending)]
         public DateTime StartDate { get; set; }
 
         [JsonProperty("enddate")]

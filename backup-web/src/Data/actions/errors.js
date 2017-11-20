@@ -1,14 +1,27 @@
+// @flow
 import uuid from 'uuid/v1';
+import type { Dispatch } from 'redux';
 
-export const RECEIVE_ERROR = 'RECEIVE_ERROR';
-export const CLEAR_ERROR = 'CLEAR_ERROR';
+export type ActionType = 'RECEIVE_ERROR' | 'CLEAR_ERROR';
 
-export const addError = message => dispatch => {
-  const id = uuid();
-  dispatch({ type: RECEIVE_ERROR, id, message });
+export type Action = RECEIVE_ERROR_Action | CLEAR_ERROR_Action;
+export type RECEIVE_ERROR_Action = {
+  type: 'RECEIVE_ERROR',
+  id: string,
+  message: string
+};
+export type CLEAR_ERROR_Action = { type: 'CLEAR_ERROR', id: string };
+
+export const addError = (message: string) => (dispatch: Dispatch<any>) => {
+  const id: string = uuid();
+  dispatch({ type: 'RECEIVE_ERROR', id, message });
   setTimeout(() => {
-    clearError(id);
+    dispatch(clearError(id));
   }, 5000);
 };
 
-export const clearError = id => ({ type: CLEAR_ERROR, id });
+export const clearError = (id: string) => (
+  dispatch: Dispatch<CLEAR_ERROR_Action>
+): void => {
+  dispatch({ type: 'CLEAR_ERROR', id });
+};

@@ -32,6 +32,7 @@ export const serverDetails = (serverId, refresh) => dispatch => {
       dispatch({ type: RECEIVE_SERVER, serverId, server });
     },
     message => {
+      dispatch({ type: RECEIVE_SERVER, serverId, server: null });
       dispatch(addError(message));
     }
   );
@@ -74,7 +75,7 @@ export const updateServer = server => dispatch => {
 
 export const getContent = (serverId, folder) => dispatch => {
   dispatch({ type: REQUEST_FOLDER, serverId });
-  if (typeof folder === 'string') {
+  if (typeof folder === 'string' && folder) {
     const uriPath = encodeURIComponent(folder);
     return GET(`/api/servers/${serverId}/content?folder=${uriPath}`).then(
       content => {

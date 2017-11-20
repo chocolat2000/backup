@@ -153,7 +153,6 @@ namespace Backup.Services
             Exception exception = null;
             var blockGuid = Guid.Empty;
 
-            await addConcurrent.WaitAsync();
             try
             {
                 if (length == -1)
@@ -162,6 +161,9 @@ namespace Backup.Services
                 }
 
                 var blockhash = new Guid(murmur.ComputeHash(block, 0, length));
+
+                await addConcurrent.WaitAsync();
+
                 var dbBlocks = await hashesDB.GetBlocksFromHash(blockhash);
 
                 foreach (var blockID in dbBlocks)
@@ -197,7 +199,6 @@ namespace Backup.Services
             return blockGuid;
         }
 
-        /*
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool Equl(byte[] a, byte[] b, int length = -1)
         {
@@ -225,7 +226,8 @@ namespace Backup.Services
             });
             return equal;
         }
-        */
+        
+        /*
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool Equl(byte[] a, byte[] b)
         {
@@ -251,7 +253,7 @@ namespace Backup.Services
 
             return true;
         }
-
+        */
 
     }
 }

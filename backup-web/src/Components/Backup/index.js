@@ -11,7 +11,7 @@ class Backups extends Component {
   }
 
   render() {
-    const { isFetching, backups, cancel } = this.props;
+    const { isFetching, backups, cancel, getBackups } = this.props;
     const content = isFetching ? (
       <div style={{ marginBottom: '1.5rem' }}>
         <i className="fa fa-spinner fa-pulse fa-3x fa-fw" />
@@ -20,8 +20,8 @@ class Backups extends Component {
       <BackupsTable
         backups={backups}
         cancel={id => {
-          this.props.cancel(id);
-          this.props.getBackups();
+          cancel(id);
+          getBackups();
         }}
       />
     );
