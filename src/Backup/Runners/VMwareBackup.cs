@@ -120,8 +120,8 @@ namespace Backup.Runners
                 var previousVMBackup = changeTrackingEnabled ? await metaDB.GetLatestVM(serverId, vmMoref) : null;
 
                 // Initialize VDDK stuff
-                Environment.SetEnvironmentVariable("PATH", @"C:\Users\bdoneux\source\repos\Backup\x64\Debug;D:\VMware-vix-disklib-6.5.2-6195444.x86_64\bin;%PATH%");
-                var status = VixDiskLib.VixDiskLib_InitEx(6, 0, null, null, null, @"D:\VMware-vix-disklib-6.5.2-6195444.x86_64", null);
+                Environment.SetEnvironmentVariable("PATH", @"C:\Users\bedn\source\repos\backup\x64\Debug;C:\VMware-vix-disklib-6.5.2-6195444.x86_64\bin;%PATH%");
+                var status = VixDiskLib.VixDiskLib_InitEx(6, 0, null, null, null, @"C:\VMware-vix-disklib-6.5.2-6195444.x86_64", null);
 
                 var connectParams = new VixDiskLibConnectParams
                 {
@@ -182,131 +182,123 @@ namespace Backup.Runners
 
                     int alignoffset = 0;
 
-                    while (bytestart < diskInfo.Capacity)
+
+                    foreach (var (start, length) in await vim25Proxy.GetDiskChangedAreas(vmMoref, snapRef, diskInfo.Key, bytestart, previousChangeId))
                     {
-                        //Console.WriteLine("ChangeInfo: start: {0}, length: {1}", diskChangeInfo.startOffset, diskChangeInfo.length);
+                        bytestart = start;
 
-                        foreach (var (start, length) in await vim25Proxy.GetDiskChangedAreas(vmMoref, snapRef, diskInfo.Key, bytestart, previousChangeId))
+                        var _bytestart = await metaDB.GetPreviousVMDiskOffset(dbDisk.Id, bytestart);
+                        if (_bytestart > 0)
                         {
-                            if (bytestart < start)
-                            {
-                                bytestart = start;
-                            }
+                            bytestart = _bytestart;
+                        }
 
-                            var _bytestart = await metaDB.GetPreviousVMDiskOffset(dbDisk.Id, bytestart);
-                            if (_bytestart > 0)
-                            {
-                                bytestart = _bytestart;
-                            }
+                        var _byteend = await metaDB.GetNextVMDiskOffset(dbDisk.VM, start + length);
+                        if (_byteend > 0)
+                        {
+                            bytelength = _byteend - bytestart;
+                        }
+                        else
+                        {
+                            bytelength = length;
+                        }
 
-                            var _byteend = await metaDB.GetNextVMDiskOffset(dbDisk.VM, start + length);
-                            if (_byteend > 0)
+
+                        iterations = (Convert.ToUInt64(bytelength) / 512) / blocksReadBatch;
+                        lastSectors = (Convert.ToUInt64(bytelength) / 512) % blocksReadBatch;
+
+                        startsector = Convert.ToUInt64(bytestart) / 512;
+                        alignoffset = Convert.ToInt32(bytestart % 512);
+                        var startNotAligned = alignoffset > 0;
+
+                        hasher.Initialize();
+
+                        for (var pos = 0UL; pos < iterations; pos++)
+                        {
+                            status = VixDiskLib.VixDiskLib_Read(vixDiskHandle, startsector, blocksReadBatch, vddkReadBuffer);
+                            startsector += blocksReadBatch;
+                            if (startNotAligned)
                             {
-                                bytelength = _byteend - bytestart;
+                                blocks = hasher.NextBlock(vddkReadBuffer, alignoffset);
+                                startNotAligned = false;
                             }
                             else
                             {
-                                bytelength = start + length - bytestart;
+                                blocks = hasher.NextBlock(vddkReadBuffer, 0);
                             }
-
-
-                            iterations = (Convert.ToUInt64(bytelength) / 512) / blocksReadBatch;
-                            lastSectors = (Convert.ToUInt64(bytelength) / 512) % blocksReadBatch;
-
-                            startsector = Convert.ToUInt64(bytestart) / 512;
-                            alignoffset = Convert.ToInt32(bytestart % 512);
-                            var startNotAligned = alignoffset > 0;
-
-                            hasher.Initialize();
-
-                            for (var pos = 0UL; pos < iterations; pos++)
+                            foreach (var block in blocks)
                             {
-                                status = VixDiskLib.VixDiskLib_Read(vixDiskHandle, startsector, blocksReadBatch, vddkReadBuffer);
-                                startsector += blocksReadBatch;
-                                if (startNotAligned)
-                                {
-                                    blocks = hasher.NextBlock(vddkReadBuffer, alignoffset);
-                                    startNotAligned = false;
-                                }
-                                else
-                                {
-                                    blocks = hasher.NextBlock(vddkReadBuffer, 0);
-                                }
-                                foreach (var block in blocks)
-                                {
-                                    var blockGuid = await BlocksManager.AddBlockToDB(block);
-                                    await metaDB.AddVMDiskBlock(new DBVMDiskBlock { Block = blockGuid, VMDisk = dbDisk.Id, Offset = bytestart });
-                                    bytestart += block.Length;
-                                    totalBlocks++;
-                                }
+                                var blockGuid = await BlocksManager.AddBlockToDB(block);
+                                await metaDB.AddVMDiskBlock(new DBVMDiskBlock { Block = blockGuid, VMDisk = dbDisk.Id, Offset = bytestart });
+                                bytestart += block.Length;
+                                totalBlocks++;
                             }
-
-                            if (lastSectors > 0UL)
-                            {
-                                status = VixDiskLib.VixDiskLib_Read(vixDiskHandle, startsector, lastSectors, vddkReadBuffer);
-                                startsector += lastSectors;
-                                if (startNotAligned)
-                                {
-                                    blocks = hasher.NextBlock(vddkReadBuffer, alignoffset, 512 * Convert.ToInt32(lastSectors));
-                                    startNotAligned = false;
-                                }
-                                else
-                                {
-                                    blocks = hasher.NextBlock(vddkReadBuffer, 0, 512 * Convert.ToInt32(lastSectors));
-                                }
-                                foreach (var block in blocks)
-                                {
-                                    var blockGuid = await BlocksManager.AddBlockToDB(block);
-                                    await metaDB.AddVMDiskBlock(new DBVMDiskBlock { Block = blockGuid, VMDisk = dbDisk.Id, Offset = bytestart });
-                                    bytestart += block.Length;
-                                    totalBlocks++;
-                                }
-                            }
-
-                            if (hasher.HasRemainingBytes)
-                            {
-                                var diskSizeInSectors = Convert.ToUInt64(diskInfo.Capacity) / 512;
-                                while (startsector < diskSizeInSectors)
-                                {
-                                    var readSize = Math.Min(blocksReadBatch, diskSizeInSectors - startsector);
-                                    status = VixDiskLib.VixDiskLib_Read(vixDiskHandle, startsector, readSize, vddkReadBuffer);
-                                    startsector += readSize;
-                                    if (startNotAligned)
-                                    {
-                                        blocks = hasher.NextBlock(vddkReadBuffer, alignoffset, Convert.ToInt32(readSize) * 512);
-                                        startNotAligned = false;
-                                    }
-                                    else
-                                    {
-                                        blocks = hasher.NextBlock(vddkReadBuffer, 0, Convert.ToInt32(readSize) * 512);
-                                    }
-                                    if (blocks.Count > 0)
-                                    {
-                                        var block = blocks[0];
-                                        var blockGuid = await BlocksManager.AddBlockToDB(block);
-                                        await metaDB.AddVMDiskBlock(new DBVMDiskBlock { Block = blockGuid, VMDisk = dbDisk.Id, Offset = bytestart });
-                                        bytestart += block.Length;
-                                        totalBlocks++;
-                                        break;
-                                    }
-                                }
-
-                                if (startsector >= diskSizeInSectors && hasher.HasRemainingBytes)
-                                {
-                                    var block = hasher.RemainingBytes();
-                                    var blockGuid = await BlocksManager.AddBlockToDB(block);
-                                    await metaDB.AddVMDiskBlock(new DBVMDiskBlock { Block = blockGuid, VMDisk = dbDisk.Id, Offset = bytestart });
-                                    bytestart += block.Length;
-                                    totalBlocks++;
-                                }
-                            }
-
-                            Console.WriteLine(DateTime.Now);
-
-                            Console.WriteLine("Total blocks : " + totalBlocks);
-                            Console.WriteLine("DB blocks : " + BlocksManager.dbBlocks);
-
                         }
+
+                        if (lastSectors > 0UL)
+                        {
+                            status = VixDiskLib.VixDiskLib_Read(vixDiskHandle, startsector, lastSectors, vddkReadBuffer);
+                            startsector += lastSectors;
+                            if (startNotAligned)
+                            {
+                                blocks = hasher.NextBlock(vddkReadBuffer, alignoffset, 512 * Convert.ToInt32(lastSectors));
+                                startNotAligned = false;
+                            }
+                            else
+                            {
+                                blocks = hasher.NextBlock(vddkReadBuffer, 0, 512 * Convert.ToInt32(lastSectors));
+                            }
+                            foreach (var block in blocks)
+                            {
+                                var blockGuid = await BlocksManager.AddBlockToDB(block);
+                                await metaDB.AddVMDiskBlock(new DBVMDiskBlock { Block = blockGuid, VMDisk = dbDisk.Id, Offset = bytestart });
+                                bytestart += block.Length;
+                                totalBlocks++;
+                            }
+                        }
+
+                        if (hasher.HasRemainingBytes)
+                        {
+                            var diskSizeInSectors = Convert.ToUInt64(diskInfo.Capacity) / 512;
+                            while (startsector < diskSizeInSectors)
+                            {
+                                var readSize = Math.Min(blocksReadBatch, diskSizeInSectors - startsector);
+                                status = VixDiskLib.VixDiskLib_Read(vixDiskHandle, startsector, readSize, vddkReadBuffer);
+                                startsector += readSize;
+                                if (startNotAligned)
+                                {
+                                    blocks = hasher.NextBlock(vddkReadBuffer, alignoffset, Convert.ToInt32(readSize) * 512);
+                                    startNotAligned = false;
+                                }
+                                else
+                                {
+                                    blocks = hasher.NextBlock(vddkReadBuffer, 0, Convert.ToInt32(readSize) * 512);
+                                }
+                                if (blocks.Count > 0)
+                                {
+                                    var block = blocks[0];
+                                    var blockGuid = await BlocksManager.AddBlockToDB(block);
+                                    await metaDB.AddVMDiskBlock(new DBVMDiskBlock { Block = blockGuid, VMDisk = dbDisk.Id, Offset = bytestart });
+                                    bytestart += block.Length;
+                                    totalBlocks++;
+                                    break;
+                                }
+                            }
+
+                            if (startsector >= diskSizeInSectors && hasher.HasRemainingBytes)
+                            {
+                                var block = hasher.RemainingBytes();
+                                var blockGuid = await BlocksManager.AddBlockToDB(block);
+                                await metaDB.AddVMDiskBlock(new DBVMDiskBlock { Block = blockGuid, VMDisk = dbDisk.Id, Offset = bytestart });
+                                bytestart += block.Length;
+                                totalBlocks++;
+                            }
+                        }
+
+                        Console.WriteLine(DateTime.Now);
+
+                        Console.WriteLine("Total blocks : " + totalBlocks);
+                        Console.WriteLine("DB blocks : " + BlocksManager.dbBlocks);
 
                     }
 

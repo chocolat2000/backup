@@ -206,6 +206,9 @@ namespace Vim25Proxy
                     new ManagedObjectReference { type = "VirtualMachineSnapshot", Value = snapshotMoRef },
                     diskKey, startOffset, changeId);
 
+            if (diskChangeInfo.changedArea == null)
+                return Enumerable.Empty<(long start, long length)>();
+
             return diskChangeInfo.changedArea.OrderBy(change => change.start).Select(change => (change.start, change.length));
         }
 

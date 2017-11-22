@@ -45,7 +45,7 @@ namespace Backup.Services
 
         public static async Task<TResult> ScheduleReader<TResult>(Func<Task<TResult>> action)
         {
-            TResult result = default(TResult);
+            TResult result = default;
             Exception exception = null;
 
             await restoreConcurrent.WaitAsync();
@@ -110,7 +110,7 @@ namespace Backup.Services
 
         public static async Task<TResult> ScheduleWriter<TResult>(Func<Task<TResult>> action)
         {
-            TResult result = default(TResult);
+            TResult result = default;
             Exception exception = null;
 
             await Task.WhenAll(new Task[]

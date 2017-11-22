@@ -15,7 +15,6 @@ namespace BackupDatabase.FileSystem
             BACKUP_FOLDER = baseLocation;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task<byte[]> ReadBlock(Guid id)
         {
             var guidArray = id.ToString();
@@ -44,7 +43,6 @@ namespace BackupDatabase.FileSystem
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task WriteBlock(Guid id, byte[] data, int length = -1)
         {
             var guidArray = id.ToString();
