@@ -29,12 +29,11 @@ class VMware extends Component {
   };
 
   render() {
-    const { serverDetails, server: { name, vms } } = this.props;
-    const vmsArray = Object.entries(vms);
+    const { serverDetails, server: { name, vms = [] } } = this.props;
 
     let vmSplices = [];
-    for (var i = 0; i < vmsArray.length / 10; i++) {
-      vmSplices.push(vmsArray.slice(i * 10, i * 10 + 10));
+    for (var i = 0; i < vms.length / 10; i++) {
+      vmSplices.push(vms.slice(i * 10, i * 10 + 10));
     }
 
     return (
