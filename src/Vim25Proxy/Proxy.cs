@@ -92,7 +92,7 @@ namespace Vim25Proxy
 
             var taskRef = await Vim25Client.CreateSnapshot_TaskAsync(new ManagedObjectReference { type = "VirtualMachine", Value = virtualMachineMoRef }, name, description, memory, quiesce);
 
-            var taskInfo = await WaitForTaskEnd(taskRef.Value);
+            var taskInfo = await WaitForTaskEnd(taskRef);
             if (taskInfo.state != TaskInfoState.success)
                 throw new Exception(taskInfo.error.localizedMessage);
             var snapRef = taskInfo.result as ManagedObjectReference;
@@ -106,7 +106,7 @@ namespace Vim25Proxy
 
             var taskRef = await Vim25Client.RemoveSnapshot_TaskAsync(new ManagedObjectReference { type = "VirtualMachineSnapshot", Value = snapshotMoRef }, removeChildren, consolidate);
 
-            var taskInfo = await WaitForTaskEnd(taskRef.Value);
+            var taskInfo = await WaitForTaskEnd(taskRef);
             if (taskInfo.state != TaskInfoState.success)
                 throw new Exception(taskInfo.error.localizedMessage);
 
@@ -114,6 +114,9 @@ namespace Vim25Proxy
 
         public async Task<object> GetVMConfigFromSnapshot(string snapshotMoRef)
         {
+            if (session == null)
+                throw new Exception("Not Logged");
+
             var propertySpecSnap = new PropertySpec
             {
                 pathSet = new string[] { "config" },
@@ -127,6 +130,26 @@ namespace Vim25Proxy
             var snapProps = await Vim25Client.RetrievePropertiesAsync(serviceContent.propertyCollector, new PropertyFilterSpec[] { propertyFilterSpecSnap });
 
             return snapProps.returnval[0].propSet.FirstOrDefault(p => p.name == "config")?.val as VirtualMachineConfigInfo;
+
+        }
+
+        public async Task CreateVM(string folderMoRef, object configSpec, string resourcePoolMoRef, string hostMoRef)
+        {
+            if (session == null)
+                throw new Exception("Not Logged");
+
+            var vmConfig = configSpec as VirtualMachineConfigSpec;
+            if (vmConfig == null)
+                throw new ArgumentException($"{nameof(configSpec)} must be of type VirtualMachineConfigSpec");
+
+            var folder = new ManagedObjectReference { type = "Folder", Value = folderMoRef };
+            var pool = new ManagedObjectReference { type = "ResourcePool", Value = resourcePoolMoRef };
+            var host = new ManagedObjectReference { type = "Host", Value = hostMoRef };
+
+            var createTask = await Vim25Client.CreateVM_TaskAsync(folder, vmConfig, pool, host);
+            var taskInfo = await WaitForTaskEnd(createTask);
+            if (taskInfo.state != TaskInfoState.success)
+                throw new Exception(taskInfo.error.localizedMessage);
 
         }
 
@@ -152,24 +175,25 @@ namespace Vim25Proxy
                 cpuHotAddEnabled = sourceConfig.cpuHotAddEnabled,
                 memoryHotAddEnabled = sourceConfig.memoryHotAddEnabled,
                 numCoresPerSocket = sourceConfig.hardware.numCoresPerSocket,
+                cpuFeatureMask = sourceConfig.cpuFeatureMask.Select(info => new VirtualMachineCpuIdInfoSpec { operation = ArrayUpdateOperation.add, info = info }).ToArray(),
                 deviceChange = sourceConfig.hardware.device.Where(
-                device =>
-                    !(
-                    device is VirtualIDEController ||
-                    device is VirtualPS2Controller ||
-                    device is VirtualPCIController ||
-                    device is VirtualSIOController ||
-                    device is VirtualMachineVMCIDevice ||
-                    device is VirtualKeyboard ||
-                    device is VirtualPointingDevice
-                    )
-                ).Select(
-                device => new VirtualDeviceConfigSpec
-                {
-                    operation = VirtualDeviceConfigSpecOperation.add,
-                    device = device,
+                    device =>
+                        !(
+                        device is VirtualIDEController ||
+                        device is VirtualPS2Controller ||
+                        device is VirtualPCIController ||
+                        device is VirtualSIOController ||
+                        device is VirtualMachineVMCIDevice ||
+                        device is VirtualKeyboard ||
+                        device is VirtualPointingDevice
+                        )
+                    ).Select(
+                    device => new VirtualDeviceConfigSpec
+                    {
+                        operation = VirtualDeviceConfigSpecOperation.add,
+                        device = device,
 
-                }).ToArray(),
+                    }).ToArray(),
                 cpuAllocation = sourceConfig.cpuAllocation,
                 memoryAllocation = sourceConfig.memoryAllocation,
                 cpuAffinity = null,
@@ -189,19 +213,22 @@ namespace Vim25Proxy
                 result = memStream.ToArray();
             }
 
-            /*
-            using (var memStream = new MemoryStream(result))
+            return result;
+        }
+
+        public object DeSerializeVMConfig(byte[] serializedVirtualMachineConfig)
+        {
+            VirtualMachineConfigSpec virtualMachineConfigSpec;
+            using (var memStream = new MemoryStream(serializedVirtualMachineConfig))
             {
                 using (var zippedStream = new DeflateStream(memStream, CompressionMode.Decompress))
                 using (var readStream = new StreamReader(zippedStream))
                 {
-                    var s = JsonConvert.DeserializeObject<VirtualMachineConfigSpec>(readStream.ReadToEnd());
+                    virtualMachineConfigSpec = JsonConvert.DeserializeObject<VirtualMachineConfigSpec>(readStream.ReadToEnd());
                 }
-                result = memStream.ToArray();
             }
-            */
 
-            return result;
+            return virtualMachineConfigSpec;
         }
 
         public object GetVMConfigParameter(object vmConfig, string value)
@@ -322,7 +349,7 @@ namespace Vim25Proxy
                     new ManagedObjectReference { type = "VirtualMachine", Value = vmMoRef },
                     new VirtualMachineConfigSpec { changeTrackingEnabled = true });
 
-            var configTaskInfo = await WaitForTaskEnd(taskRef.Value);
+            var configTaskInfo = await WaitForTaskEnd(taskRef);
 
             if (configTaskInfo.state != TaskInfoState.success)
                 throw new Exception(configTaskInfo.error.localizedMessage);
@@ -331,7 +358,7 @@ namespace Vim25Proxy
             await RemoveSnapshot(snapTask, false, true);
         }
 
-        public async Task<IDictionary<string, string>> GetVMs()
+        public async Task<IEnumerable<(string moRef, string name, string parent)>> GetFolders()
         {
             if (session == null)
                 throw new Exception("Not Logged");
@@ -342,7 +369,7 @@ namespace Vim25Proxy
             {
                 type = "Datacenter",
                 path = "vmFolder",
-                selectSet = new SelectionSpec[] { new SelectionSpec() { name = "folderTSpec" } }
+                selectSet = new SelectionSpec[] { new SelectionSpec { name = "folderTSpec" } }
             };
 
             var folderTS = new TraversalSpec
@@ -350,7 +377,58 @@ namespace Vim25Proxy
                 name = "folderTSpec",
                 type = "Folder",
                 path = "childEntity",
-                selectSet = new SelectionSpec[] { new SelectionSpec() { name = "folderTSpec" }, dc2vmFolder }
+                selectSet = new SelectionSpec[] { new SelectionSpec { name = "folderTSpec" }, dc2vmFolder }
+            };
+
+
+            var ospec = new ObjectSpec
+            {
+                obj = serviceContent.rootFolder,
+                skip = false,
+                selectSet = new SelectionSpec[] { folderTS }
+            };
+
+            /////////////////////////////////////////////
+
+            var vmSp = new PropertySpec
+            {
+                type = "Folder",
+                all = false,
+                pathSet = new string[] { "parent", "name" }
+            };
+
+            ////////////////////////////////////////////
+
+            var fs = new PropertyFilterSpec { objectSet = new ObjectSpec[] { ospec }, propSet = new PropertySpec[] { vmSp } };
+
+            var vmProps = await Vim25Client.RetrievePropertiesAsync(serviceContent.propertyCollector, new PropertyFilterSpec[] { fs });
+
+            return vmProps.returnval
+                .Select(obj => (obj.obj.Value, (string)obj.propSet[0].val, (string)obj.propSet[1].val));
+        }
+
+
+        public async Task<IEnumerable<(string moRef, string name)>> GetVMs()
+        {
+            await GetFolders();
+            if (session == null)
+                throw new Exception("Not Logged");
+
+            ////////////////////////////////////////////////////////
+
+            var dc2vmFolder = new TraversalSpec
+            {
+                type = "Datacenter",
+                path = "vmFolder",
+                selectSet = new SelectionSpec[] { new SelectionSpec { name = "folderTSpec" } }
+            };
+
+            var folderTS = new TraversalSpec
+            {
+                name = "folderTSpec",
+                type = "Folder",
+                path = "childEntity",
+                selectSet = new SelectionSpec[] { new SelectionSpec { name = "folderTSpec" }, dc2vmFolder }
             };
 
             var ospec = new ObjectSpec
@@ -376,14 +454,16 @@ namespace Vim25Proxy
             var vmProps = await Vim25Client.RetrievePropertiesAsync(serviceContent.propertyCollector, new PropertyFilterSpec[] { fs });
 
             return vmProps.returnval
-                .OrderBy(obj => (string)obj.propSet[0].val)
-                .ToDictionary(obj => obj.obj.Value, obj => (string)obj.propSet[0].val);
+                .Select(obj => (obj.obj.Value, (string)obj.propSet[0].val));
         }
 
-        private async Task<TaskInfo> WaitForTaskEnd(string taskMoRef)
+        private async Task<TaskInfo> WaitForTaskEnd(ManagedObjectReference task)
         {
             if (session == null)
                 throw new Exception("Not Logged");
+
+            if (task.type != "Task")
+                throw new ArgumentException($"{nameof(task)} is not of type \"Task\"");
 
             var propertySpecTask = new PropertySpec
             {
@@ -393,16 +473,17 @@ namespace Vim25Proxy
             var propertyFilterSpecTask = new PropertyFilterSpec
             {
                 propSet = new PropertySpec[] { propertySpecTask },
-                objectSet = new ObjectSpec[] { new ObjectSpec { obj = new ManagedObjectReference { type = "Task", Value = taskMoRef } } }
+                objectSet = new ObjectSpec[] { new ObjectSpec { obj = task } }
             };
 
-            TaskInfo configTaskInfo;
-            do
+            var taskProps = await Vim25Client.RetrievePropertiesAsync(serviceContent.propertyCollector, new PropertyFilterSpec[] { propertyFilterSpecTask });
+            var configTaskInfo = taskProps.returnval[0].propSet[0].val as TaskInfo;
+            while (configTaskInfo?.state == TaskInfoState.running)
             {
                 await Task.Delay(2000);
-                var taskProps = await Vim25Client.RetrievePropertiesAsync(serviceContent.propertyCollector, new PropertyFilterSpec[] { propertyFilterSpecTask });
+                taskProps = await Vim25Client.RetrievePropertiesAsync(serviceContent.propertyCollector, new PropertyFilterSpec[] { propertyFilterSpecTask });
                 configTaskInfo = taskProps.returnval[0].propSet[0].val as TaskInfo;
-            } while (configTaskInfo?.state == TaskInfoState.running);
+            };
 
             return configTaskInfo;
 
