@@ -1,15 +1,13 @@
 ﻿using System;
 using System.IO;
 using System.IO.Compression;
-using System.Xml.Serialization;
-using System.Net.Http;
 using System.Linq;
 using System.Net;
 using System.Net.Security;
 using System.Collections.Generic;
 using System.ServiceModel;
-using System.ServiceModel.Channels;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 using Vim25Api;
 
 namespace Vim25Proxy
@@ -134,16 +132,74 @@ namespace Vim25Proxy
 
         public byte[] SerializeVMConfig(object vmConfig)
         {
+            var sourceConfig = vmConfig as VirtualMachineConfigInfo;
+            if (sourceConfig == null)
+                throw new ArgumentException($"{nameof(vmConfig)} must be of type VirtualMachineConfigInfo");
+
+            var configSpec = new VirtualMachineConfigSpec
+            {
+                name = sourceConfig.name,
+                version = sourceConfig.version,
+                guestId = sourceConfig.guestId,
+                alternateGuestName = sourceConfig.alternateGuestName,
+                files = sourceConfig.files,
+                tools = sourceConfig.tools,
+                flags = sourceConfig.flags,
+                consolePreferences = null,
+                powerOpInfo = sourceConfig.defaultPowerOps,
+                numCPUs = sourceConfig.hardware.numCPU,
+                memoryMB = sourceConfig.hardware.memoryMB,
+                cpuHotAddEnabled = sourceConfig.cpuHotAddEnabled,
+                memoryHotAddEnabled = sourceConfig.memoryHotAddEnabled,
+                numCoresPerSocket = sourceConfig.hardware.numCoresPerSocket,
+                deviceChange = sourceConfig.hardware.device.Where(
+                device =>
+                    !(
+                    device is VirtualIDEController ||
+                    device is VirtualPS2Controller ||
+                    device is VirtualPCIController ||
+                    device is VirtualSIOController ||
+                    device is VirtualMachineVMCIDevice ||
+                    device is VirtualKeyboard ||
+                    device is VirtualPointingDevice
+                    )
+                ).Select(
+                device => new VirtualDeviceConfigSpec
+                {
+                    operation = VirtualDeviceConfigSpecOperation.add,
+                    device = device,
+
+                }).ToArray(),
+                cpuAllocation = sourceConfig.cpuAllocation,
+                memoryAllocation = sourceConfig.memoryAllocation,
+                cpuAffinity = null,
+                memoryAffinity = null,
+                networkShaper = null,
+                bootOptions = null
+            };
+
             byte[] result = null;
             using (var memStream = new MemoryStream())
             {
                 using (var zippedStream = new DeflateStream(memStream, CompressionMode.Compress))
+                using (var writeStream = new StreamWriter(zippedStream))
                 {
-                    var xs = new XmlSerializer(vmConfig.GetType());
-                    xs.Serialize(zippedStream, vmConfig);
+                    writeStream.Write(JsonConvert.SerializeObject(configSpec));
                 }
                 result = memStream.ToArray();
             }
+
+            /*
+            using (var memStream = new MemoryStream(result))
+            {
+                using (var zippedStream = new DeflateStream(memStream, CompressionMode.Decompress))
+                using (var readStream = new StreamReader(zippedStream))
+                {
+                    var s = JsonConvert.DeserializeObject<VirtualMachineConfigSpec>(readStream.ReadToEnd());
+                }
+                result = memStream.ToArray();
+            }
+            */
 
             return result;
         }

@@ -113,7 +113,7 @@ namespace Backup.Runners
 
                 vmBackup.Name = vim25Proxy.GetVMConfigParameter(vmConfig, "name") as string;
 
-                //vmBackup.Config = vim25Proxy.SerializeVMConfig(vmConfig);
+                vmBackup.Config = vim25Proxy.SerializeVMConfig(vmConfig);
 
                 vmBackup.Id = await metaDB.AddVMwareVM(vmBackup);
 
