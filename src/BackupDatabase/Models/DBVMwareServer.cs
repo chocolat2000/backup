@@ -19,8 +19,9 @@ namespace BackupDatabase.Models
         public string Password { get; set; }
 
         [JsonProperty("vms")]
-        [Column("vms", Type = typeof (Dictionary<string, string>))]
-        public IDictionary<string, string> VMs { get; set; }
+        [Column("vms")]
+        [FrozenValue]
+        public string [][] VMs { get; set; }
     }
 
 }

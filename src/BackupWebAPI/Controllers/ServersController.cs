@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Authorization;
 using BackupWebAPI.Filters;
 using Newtonsoft.Json.Linq;
 using System.Security.Cryptography.X509Certificates;
+using System.Text.RegularExpressions;
 
 namespace BackupWeb.Controllers
 {
@@ -55,15 +56,8 @@ namespace BackupWeb.Controllers
         public async Task<IActionResult> Get(Guid id, bool refresh = false)
         {
             var servertype = await metaDB.GetServerType(id);
-            DBServer server = null;
-            try
-            {
-                server = await GetServer(id, servertype, refresh);
-            }
-            catch(Exception)
-            {
-                //Todo: some logging ...
-            }
+            var server = await GetServer(id, servertype, refresh);
+
             if (server == null) return NotFound();
             if (refresh)
             {
@@ -78,7 +72,7 @@ namespace BackupWeb.Controllers
                             await proxy.Login(vmserver.Username, vmserver.Password);
                             vmserver.Username = null;
                             vmserver.Password = null;
-                            vmserver.VMs = await proxy.GetVMs();
+                            vmserver.VMs = (await proxy.GetVMs()).OrderBy(kv => kv.name).Select(kv => new string[] { kv.moRef, kv.name }).ToArray();
                             await metaDB.UpdateServer(vmserver);
                         }
                         break;
@@ -127,7 +121,7 @@ namespace BackupWeb.Controllers
                 (sender, certificate, chain, sslPolicyErrors) => 
                 {
                     var cert2 = new X509Certificate2(certificate);
-                    server.ThumbPrint = cert2.Thumbprint;
+                    server.ThumbPrint = string.Join(':', Regex.Matches(cert2.Thumbprint, "..").Select(m => m.Value));
                     return true;
                 };
             (await request.GetResponseAsync()).Close();
