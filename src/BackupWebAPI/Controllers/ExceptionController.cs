@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Diagnostics;
+using BackupWebAPI.Models;
 
 namespace BackupWebAPI.Controllers
 {
@@ -16,7 +17,7 @@ namespace BackupWebAPI.Controllers
         {
             var ex = HttpContext.Features.Get<IExceptionHandlerFeature>();
 
-            return StatusCode(StatusCodes.Status500InternalServerError, new { Message = ex.Error.Message });
+            return StatusCode(StatusCodes.Status500InternalServerError, new ExceptionMessage { Message = ex.Error.Message });
         }
 
     }

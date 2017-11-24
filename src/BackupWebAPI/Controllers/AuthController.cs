@@ -10,8 +10,7 @@ using System.Security.Claims;
 using System.Text;
 using BackupDatabase;
 using BackupDatabase.Models;
-using System.ComponentModel.DataAnnotations;
-using Newtonsoft.Json;
+using BackupWebAPI.Models;
 
 namespace BackupWeb.Controllers
 {
@@ -25,24 +24,6 @@ namespace BackupWeb.Controllers
 
         private readonly SymmetricSecurityKey key;
         private readonly SigningCredentials creds;
-
-
-        public class UserLogin
-        {
-            [JsonProperty("login")]
-            [Required]
-            public string Login { get; set; }
-
-            [JsonProperty("password")]
-            [Required]
-            public string Password { get; set; }
-        }
-
-        public class LoginError
-        {
-            [JsonProperty("reason")]
-            public string Reason { get; set; }
-        }
 
         public AuthController(IUsersDBAccess usersDB, IConfiguration configuration)
         {

@@ -13,6 +13,7 @@ using BackupWebAPI.Filters;
 using Newtonsoft.Json.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
+using BackupWebAPI.Models;
 
 namespace BackupWeb.Controllers
 {
@@ -30,10 +31,11 @@ namespace BackupWeb.Controllers
             this.agentClient = agentClient;
         }
 
-        private async Task<DBServer> GetServer(Guid id, ServerType type, bool withcreds = false)
+        private async Task<DBServer> GetServer(Guid id, bool withcreds = false)
         {
+            var servertype = await metaDB.GetServerType(id);
             DBServer server = null;
-            switch (type)
+            switch (servertype)
             {
                 case ServerType.Windows:
                     server = await metaDB.GetWindowsServer(id, withcreds);
@@ -55,13 +57,13 @@ namespace BackupWeb.Controllers
         [HttpGet("{id:Guid}")]
         public async Task<IActionResult> Get(Guid id, bool refresh = false)
         {
-            var servertype = await metaDB.GetServerType(id);
-            var server = await GetServer(id, servertype, refresh);
+            
+            var server = await GetServer(id, refresh);
 
             if (server == null) return NotFound();
             if (refresh)
             {
-                switch (servertype)
+                switch (server.Type)
                 {
 
                     case ServerType.VMware:
@@ -72,7 +74,7 @@ namespace BackupWeb.Controllers
                             await proxy.Login(vmserver.Username, vmserver.Password);
                             vmserver.Username = null;
                             vmserver.Password = null;
-                            vmserver.VMs = (await proxy.GetVMs()).OrderBy(kv => kv.name).Select(kv => new string[] { kv.moRef, kv.name }).ToArray();
+                            vmserver.VMs = (await proxy.GetVMs()).OrderBy(kv => kv.Name).Select(vm => new string[] { vm.MoRef, vm.Name }).ToArray();
                             await metaDB.UpdateServer(vmserver);
                         }
                         break;
@@ -80,6 +82,26 @@ namespace BackupWeb.Controllers
             }
 
             return Ok(server);
+        }
+
+        [HttpGet("{id:Guid}/arbo")]
+        public async Task<IActionResult> GetArbo(Guid id)
+        {
+            var server = await GetServer(id, true);
+            if (server == null) return NotFound();
+            if (server.Type != ServerType.VMware)
+                throw new ArgumentException($"Server GUID {{{id}}} is not of type {ServerType.VMware}");
+
+            var arbo = new VMwareArbo();
+            using (var proxy = new Vim25Proxy.Proxy(server.Ip))
+            {
+                var vmserver = server as DBVMwareServer;
+                await proxy.Login(vmserver.Username, vmserver.Password);
+                arbo.Folders = await proxy.GetFolders();
+                arbo.Pools = await proxy.GetPools();
+            }
+
+            return Ok(arbo);
         }
 
         [HttpDelete("{id:Guid}")]

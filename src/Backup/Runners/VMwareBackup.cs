@@ -73,13 +73,13 @@ namespace Backup.Runners
                 if (vmMoref == null)
                 {
                     int selected = -1;
-                    var vmList = (await vim25Proxy.GetVMs()).OrderBy(kv => kv.name).ToArray();
+                    var vmList = (await vim25Proxy.GetVMs()).OrderBy(vm => vm.Name).ToArray();
                     do
                     {
                         var i = 1;
-                        foreach (var kv in vmList)
+                        foreach (var vm in vmList)
                         {
-                            Console.WriteLine("{0}\t{1}", i++, kv.name);
+                            Console.WriteLine("{0}\t{1}", i++, vm.Name);
                         }
                         Console.WriteLine("Choose a VM: ");
                         if (!int.TryParse(Console.ReadLine(), out selected) || selected < 1 || selected > vmList.Length)
@@ -87,7 +87,7 @@ namespace Backup.Runners
                             selected = -1;
                         }
                     } while (selected < 1);
-                    vmMoref = vmList[selected - 1].moRef;
+                    vmMoref = vmList[selected - 1].MoRef;
                 }
 
                 CheckCancelStatus();

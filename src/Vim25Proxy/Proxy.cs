@@ -9,6 +9,7 @@ using System.ServiceModel;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Vim25Api;
+using Vim25Proxy.Models;
 
 namespace Vim25Proxy
 {
@@ -358,7 +359,7 @@ namespace Vim25Proxy
             await RemoveSnapshot(snapTask, false, true);
         }
 
-        public async Task<IEnumerable<(string moRef, string name, string parent)>> GetFolders()
+        public async Task<IEnumerable<ManagedEntity>> GetFolders()
         {
             if (session == null)
                 throw new Exception("Not Logged");
@@ -390,7 +391,14 @@ namespace Vim25Proxy
 
             /////////////////////////////////////////////
 
-            var vmSp = new PropertySpec
+            var dcSp = new PropertySpec
+            {
+                type = "Datacenter",
+                all = false,
+                pathSet = new string[] { "parent", "name" }
+            };
+
+            var folderSp = new PropertySpec
             {
                 type = "Folder",
                 all = false,
@@ -399,18 +407,115 @@ namespace Vim25Proxy
 
             ////////////////////////////////////////////
 
-            var fs = new PropertyFilterSpec { objectSet = new ObjectSpec[] { ospec }, propSet = new PropertySpec[] { vmSp } };
+            var fs = new PropertyFilterSpec { objectSet = new ObjectSpec[] { ospec }, propSet = new PropertySpec[] { dcSp, folderSp } };
 
             var vmProps = await Vim25Client.RetrievePropertiesAsync(serviceContent.propertyCollector, new PropertyFilterSpec[] { fs });
 
             return vmProps.returnval
-                .Select(obj => (obj.obj.Value, (string)obj.propSet[0].val, (string)obj.propSet[1].val));
+                .Select(obj =>
+                new ManagedEntity
+                {
+                    MoRef = obj.obj.Value,
+                    Type = obj.obj.type,
+                    Name = (string)obj.propSet.FirstOrDefault(o => o.name == "name")?.val,
+                    Parent = ((ManagedObjectReference)obj.propSet.FirstOrDefault(o => o.name == "parent")?.val)?.Value
+                });
+        }
+
+        public async Task<IEnumerable<ManagedEntity>> GetPools()
+        {
+            if (session == null)
+                throw new Exception("Not Logged");
+
+            ////////////////////////////////////////////////////////
+
+            var dc2hostFolder = new TraversalSpec
+            {
+                type = "Datacenter",
+                path = "hostFolder",
+                selectSet = new SelectionSpec[] { new SelectionSpec { name = "ressourcesTSpec" } }
+            };
+
+            var cr2resourcePool = new TraversalSpec
+            {
+                type = "ComputeResource",
+                path = "resourcePool",
+                selectSet = new SelectionSpec[] { new SelectionSpec { name = "ressourcesTSpec" } }
+            };
+
+            var rp2rp = new TraversalSpec
+            {
+                type = "ResourcePool",
+                path = "resourcePool",
+                selectSet = new SelectionSpec[] { new SelectionSpec { name = "ressourcesTSpec" } }
+            };
+
+            var folderTS = new TraversalSpec
+            {
+                name = "ressourcesTSpec",
+                type = "Folder",
+                path = "childEntity",
+                selectSet = new SelectionSpec[] { new SelectionSpec { name = "ressourcesTSpec" }, dc2hostFolder, cr2resourcePool, rp2rp }
+            };
+
+
+            var ospec = new ObjectSpec
+            {
+                obj = serviceContent.rootFolder,
+                skip = false,
+                selectSet = new SelectionSpec[] { folderTS }
+            };
+
+            /////////////////////////////////////////////
+
+            var dcSp = new PropertySpec
+            {
+                type = "Datacenter",
+                all = false,
+                pathSet = new string[] { "parent", "name" }
+            };
+
+            var folderSp = new PropertySpec
+            {
+                type = "Folder",
+                all = false,
+                pathSet = new string[] { "parent", "name" }
+            };
+
+            var computeSp = new PropertySpec
+            {
+                type = "ComputeResource",
+                all = false,
+                pathSet = new string[] { "parent", "name" }
+            };
+
+            var rpSp = new PropertySpec
+            {
+                type = "ResourcePool",
+                all = false,
+                pathSet = new string[] { "parent", "name" }
+            };
+
+            ////////////////////////////////////////////
+
+            var fs = new PropertyFilterSpec { objectSet = new ObjectSpec[] { ospec }, propSet = new PropertySpec[] { dcSp, folderSp, computeSp, rpSp } };
+
+            var vmProps = await Vim25Client.RetrievePropertiesAsync(serviceContent.propertyCollector, new PropertyFilterSpec[] { fs });
+
+            return vmProps.returnval
+                .Select(obj => 
+                new ManagedEntity
+                {
+                    MoRef = obj.obj.Value,
+                    Type = obj.obj.type,
+                    Name = (string)obj.propSet.FirstOrDefault(o => o.name == "name")?.val,
+                    Parent = ((ManagedObjectReference)obj.propSet.FirstOrDefault(o => o.name == "parent")?.val)?.Value
+                });
         }
 
 
-        public async Task<IEnumerable<(string moRef, string name)>> GetVMs()
+        public async Task<IEnumerable<ManagedEntity>> GetVMs()
         {
-            await GetFolders();
             if (session == null)
                 throw new Exception("Not Logged");
 
@@ -454,7 +559,7 @@ namespace Vim25Proxy
             var vmProps = await Vim25Client.RetrievePropertiesAsync(serviceContent.propertyCollector, new PropertyFilterSpec[] { fs });
 
             return vmProps.returnval
-                .Select(obj => (obj.obj.Value, (string)obj.propSet[0].val));
+                .Select(obj => new ManagedEntity { MoRef = obj.obj.Value, Type = obj.obj.type, Name = (string)obj.propSet[0].val });
         }
 
         private async Task<TaskInfo> WaitForTaskEnd(ManagedObjectReference task)
