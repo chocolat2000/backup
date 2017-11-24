@@ -221,7 +221,7 @@ namespace Backup
                                                 {
                                                     var password = "";
                                                     ConsoleKeyInfo key;
-                                                    Console.Write("Chose password: ");
+                                                    Console.Write("Choose password: ");
                                                     do
                                                     {
                                                         key = Console.ReadKey(true);
@@ -237,8 +237,8 @@ namespace Backup
                                                             }
                                                         }
 
-                                                    }
-                                                    while (key.Key != ConsoleKey.Enter);
+                                                    } while (key.Key != ConsoleKey.Enter);
+                                                    Console.WriteLine();
                                                     await usersDB.AddUser(command[3], password, new string[] { command[2] });
                                                 }
                                                 break;
