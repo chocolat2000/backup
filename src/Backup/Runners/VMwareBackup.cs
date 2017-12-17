@@ -9,9 +9,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Backup.Services.VDDK;
-using System.Xml.Serialization;
-using System.IO;
-using System.IO.Compression;
 using Vim25Proxy;
 
 namespace Backup.Runners

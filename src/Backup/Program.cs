@@ -28,11 +28,11 @@ namespace Backup
 
         private static async Task Run(string[] args)
         {
-            using (var metaDB = new BackupDatabase.Cassandra.CassandraMetaDB("127.0.0.1") { PasswordsKey = Encoding.UTF8.GetBytes(Configuration["Encryption:PasswordsKey"]) })
-            using (var usersDB = new BackupDatabase.Cassandra.CassandraUsersDB("127.0.0.1"))
+            using (var metaDB = new BackupDatabase.Cassandra.CassandraMetaDB(Configuration["Database:CassandraMetaIP"]) { PasswordsKey = Encoding.UTF8.GetBytes(Configuration["Encryption:PasswordsKey"]) })
+            using (var usersDB = new BackupDatabase.Cassandra.CassandraUsersDB(Configuration["Database:CassandraMetaIP"]))
             {
                 Console.Write("> ");
-                var command = Console.ReadLine().Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                var command = (Console.ReadLine() ?? "").Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                 while (command?.Length == 0 || command[0] != "exit")
                 {
                     if (command.Length > 0)
@@ -255,7 +255,7 @@ namespace Backup
                         }
                     }
                     Console.Write("> ");
-                    command = Console.ReadLine().Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    command = (Console.ReadLine() ?? "").Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                 }
             }
         }

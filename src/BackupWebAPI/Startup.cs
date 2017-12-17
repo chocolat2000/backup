@@ -106,7 +106,14 @@ namespace BackupWeb
             app.UseStaticFiles();
             app.UseAuthentication();
 
-            app.UseMvc();
+            app.UseMvc(routes =>
+            {
+                routes.MapRoute(
+                    name: "catch-all",
+                    template: "{*url}",
+                    defaults: new { controller = "Home", action = "RedirectIndex" }
+                );
+            });
         }
     }
 }
