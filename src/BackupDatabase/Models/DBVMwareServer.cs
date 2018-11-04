@@ -22,6 +22,12 @@ namespace BackupDatabase.Models
         [Column("vms")]
         [FrozenValue]
         public string [][] VMs { get; set; }
+
+        public DBVMwareServer()
+        {
+            Type = ServerType.VMware;
+        }
+
     }
 
 }

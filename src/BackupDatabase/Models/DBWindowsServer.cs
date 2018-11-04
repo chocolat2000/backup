@@ -13,6 +13,11 @@ namespace BackupDatabase.Models
         [Column("password")]
         public string Password { get; set; }
 
+        public DBWindowsServer()
+        {
+            Type = ServerType.Windows;
+        }
+
     }
 
 }
