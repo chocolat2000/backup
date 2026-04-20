@@ -21,7 +21,7 @@ type DBServer struct {
 	VMwareUsername   string   `json:"vmware_username,omitempty" gorm:"column:vmware_username"`
 	VMwarePassword   string   `json:"vmware_password,omitempty" gorm:"column:vmware_password"`
 	// For arrays of arrays in pg, one approach is JSONB, which is highly compatible.
-	VMwareVMs        [][]string `json:"vmware_vms,omitempty" gorm:"column:vmware_vms;type:jsonb"`
+	VMwareVMs        [][]string `json:"vmware_vms,omitempty" gorm:"column:vmware_vms;type:jsonb;serializer:json"`
 }
 
 // TableName overrides the table name for GORM.
