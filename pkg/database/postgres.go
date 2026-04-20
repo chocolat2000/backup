@@ -147,13 +147,13 @@ func (s *PostgresStore) GetWindowsServer(id uuid.UUID, withCreds bool) (*models.
 	if err != nil {
 		return nil, err
 	}
-	if withCreds && server.WindowsPassword != "" {
-		decrypted, err := s.encryptor.Decrypt(server.WindowsPassword)
+	if withCreds && server.Password != "" {
+		decrypted, err := s.encryptor.Decrypt(server.Password)
 		if err == nil {
-			server.WindowsPassword = decrypted
+			server.Password = decrypted
 		}
 	} else {
-		server.WindowsPassword = ""
+		server.Password = ""
 	}
 	return &server, nil
 }
@@ -164,13 +164,13 @@ func (s *PostgresStore) GetVMWareServer(id uuid.UUID, withCreds bool) (*models.D
 	if err != nil {
 		return nil, err
 	}
-	if withCreds && server.VMwarePassword != "" {
-		decrypted, err := s.encryptor.Decrypt(server.VMwarePassword)
+	if withCreds && server.Password != "" {
+		decrypted, err := s.encryptor.Decrypt(server.Password)
 		if err == nil {
-			server.VMwarePassword = decrypted
+			server.Password = decrypted
 		}
 	} else {
-		server.VMwarePassword = ""
+		server.Password = ""
 	}
 	return &server, nil
 }
@@ -180,16 +180,16 @@ func (s *PostgresStore) AddServer(server *models.DBServer) (uuid.UUID, error) {
 		server.ID = uuid.New()
 	}
 
-	if server.WindowsPassword != "" {
-		enc, err := s.encryptor.Encrypt(server.WindowsPassword)
+	if server.Password != "" {
+		enc, err := s.encryptor.Encrypt(server.Password)
 		if err == nil {
-			server.WindowsPassword = enc
+			server.Password = enc
 		}
 	}
-	if server.VMwarePassword != "" {
-		enc, err := s.encryptor.Encrypt(server.VMwarePassword)
+	if server.Password != "" {
+		enc, err := s.encryptor.Encrypt(server.Password)
 		if err == nil {
-			server.VMwarePassword = enc
+			server.Password = enc
 		}
 	}
 
@@ -198,16 +198,16 @@ func (s *PostgresStore) AddServer(server *models.DBServer) (uuid.UUID, error) {
 }
 
 func (s *PostgresStore) UpdateServer(server *models.DBServer) error {
-	if server.WindowsPassword != "" {
-		enc, err := s.encryptor.Encrypt(server.WindowsPassword)
+	if server.Password != "" {
+		enc, err := s.encryptor.Encrypt(server.Password)
 		if err == nil {
-			server.WindowsPassword = enc
+			server.Password = enc
 		}
 	}
-	if server.VMwarePassword != "" {
-		enc, err := s.encryptor.Encrypt(server.VMwarePassword)
+	if server.Password != "" {
+		enc, err := s.encryptor.Encrypt(server.Password)
 		if err == nil {
-			server.VMwarePassword = enc
+			server.Password = enc
 		}
 	}
 	return s.db.Save(server).Error

@@ -1,0 +1,21 @@
+--- internal/api/handlers/servers.go
++++ internal/api/handlers/servers.go
+@@ -3,6 +3,7 @@
+ import (
+	"crypto/tls"
++	"crypto/sha1"
+	"encoding/json"
+	"fmt"
+	"net/http"
+@@ -216,9 +217,10 @@
+
+	if resp.TLS != nil && len(resp.TLS.PeerCertificates) > 0 {
+		cert := resp.TLS.PeerCertificates[0]
+		// Convert SHA1 hash bytes to XX:XX:XX formatted string
++		hash := sha1.Sum(cert.Raw)
+		var thumbprintParts []string
+-		for _, b := range cert.Signature {
++		for _, b := range hash {
+			thumbprintParts = append(thumbprintParts, fmt.Sprintf("%02X", b))
+		}
+		server.VMwareThumbPrint = strings.Join(thumbprintParts, ":")

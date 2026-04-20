@@ -74,7 +74,7 @@ func (am *AuthMiddleware) RequireRole(requiredRole string, next http.Handler) ht
 			return
 		}
 
-		// Roles are comma separated strings based on the original code
+
 		roles := strings.Split(claims.Roles, ",")
 		hasRole := false
 		for _, role := range roles {
