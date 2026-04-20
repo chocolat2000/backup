@@ -7,17 +7,20 @@ import (
 	"github.com/google/uuid"
 )
 
-// FolderContent represents directory contents structure originally expected by AgentClient.
+// FolderContent represents directory contents structure.
 type FolderContent struct {
 	Folders []string `json:"folders"`
 	Files   []string `json:"files"`
 }
 
 // AgentClient represents the external proxy interface communicating with backup agents.
-// This is a temporary interface holding place until AgentProxy is fully migrated.
+
 type AgentClient interface {
 	GetDrives(ctx context.Context, serverID uuid.UUID) ([]string, error)
 	GetContent(ctx context.Context, serverID uuid.UUID, folder string) (*FolderContent, error)
+	Backup(ctx context.Context, serverID uuid.UUID, items []string, backupID uuid.UUID) error
+	BackupComplete(ctx context.Context, serverID uuid.UUID, backupID uuid.UUID) error
+	GetStream(ctx context.Context, serverID uuid.UUID, streamID uuid.UUID) ([]byte, error)
 }
 
 // VMwareArbo represents the VMware structure Tree.
@@ -32,17 +35,6 @@ type VMwareProxy interface {
 	GetVMs(ctx context.Context) ([][]string, error)
 	GetFolders(ctx context.Context) (interface{}, error)
 	GetPools(ctx context.Context) (interface{}, error)
-}
-
-// NotImplementedAgentClient is a mock.
-type NotImplementedAgentClient struct{}
-
-func (c *NotImplementedAgentClient) GetDrives(ctx context.Context, serverID uuid.UUID) ([]string, error) {
-	return nil, errors.New("AgentProxy not yet implemented in Go")
-}
-
-func (c *NotImplementedAgentClient) GetContent(ctx context.Context, serverID uuid.UUID, folder string) (*FolderContent, error) {
-	return nil, errors.New("AgentProxy not yet implemented in Go")
 }
 
 // NotImplementedVMwareProxy is a mock.

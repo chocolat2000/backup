@@ -186,12 +186,24 @@ func (s *PostgresStore) AddServer(server *models.DBServer) (uuid.UUID, error) {
 			server.Password = enc
 		}
 	}
+	if server.Password != "" {
+		enc, err := s.encryptor.Encrypt(server.Password)
+		if err == nil {
+			server.Password = enc
+		}
+	}
 
 	err := s.db.Create(server).Error
 	return server.ID, err
 }
 
 func (s *PostgresStore) UpdateServer(server *models.DBServer) error {
+	if server.Password != "" {
+		enc, err := s.encryptor.Encrypt(server.Password)
+		if err == nil {
+			server.Password = enc
+		}
+	}
 	if server.Password != "" {
 		enc, err := s.encryptor.Encrypt(server.Password)
 		if err == nil {

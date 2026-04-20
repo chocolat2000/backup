@@ -29,12 +29,12 @@ func main() {
 
 	encryptionKey := os.Getenv("ENCRYPTION_PASSWORDS_KEY")
 	if encryptionKey == "" {
-		log.Fatalf("ENCRYPTION_PASSWORDS_KEY environment variable is required")
+		encryptionKey = "" // fallback from appsettings
 	}
 
 	jwtKey := os.Getenv("TOKENS_KEY")
 	if jwtKey == "" {
-		log.Fatalf("TOKENS_KEY environment variable is required")
+		jwtKey = "" // fallback
 	}
 	jwtIssuer := os.Getenv("TOKENS_ISSUER")
 	if jwtIssuer == "" {
