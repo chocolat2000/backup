@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+package agentpb;
+
+option go_package = "backup/pkg/agentpb";
+
+// Request/Response for GetDrives
+message GetDrivesRequest {
+  string server_id = 1;
+}
+
+message GetDrivesResponse {
+  repeated string drives = 1;
+}
+
+// Request/Response for GetContent
+message GetContentRequest {
+  string server_id = 1;
+  string folder = 2;
+}
+
+message FolderContent {
+  repeated string folders = 1;
+  repeated string files = 2;
+}
+
+// Request/Response for Backup commands
+message BackupItem {
+  string name = 1;
+  enum ItemType {
+    FILE = 0;
+    FOLDER = 1;
+  }
+  ItemType type = 2;
+  int64 last_write_time = 3; // Unix timestamp
+  int64 length = 4;
+  string stream_guid = 5;
+}
+
+message BackupRequest {
+  repeated string items = 1;
+  string backup_id = 2;
+}
+
+message BackupResponse {
+}
+
+message BackupCompleteRequest {
+  string backup_id = 1;
+}
+
+message BackupCompleteResponse {
+}
+
+// Stream Service
+message StreamRequest {
+  string stream_id = 1;
+}
+
+message StreamChunk {
+  bytes data = 1;
+}
+
+// The AgentService encompasses all previous services:
+
+service AgentService {
+  // General Service
+  rpc GetDrives(GetDrivesRequest) returns (GetDrivesResponse);
+  rpc GetContent(GetContentRequest) returns (FolderContent);
+
+  // Backup Service
+  rpc Backup(BackupRequest) returns (BackupResponse);
+  rpc BackupComplete(BackupCompleteRequest) returns (BackupCompleteResponse);
+
+  // Stream Service
+  rpc GetStream(StreamRequest) returns (stream StreamChunk);
+}

@@ -1,16 +1,34 @@
-FROM microsoft/aspnetcore-build:2.0 AS build-env
+# Build environment for Go
+FROM golang:1.22-alpine AS build-env
 WORKDIR /app
 
-# Copy csproj and restore as distinct layers
-COPY src/Backup/BackupNetworkLibrary.csproj ./src/Backup/
-RUN dotnet restore
+# Copy go mod and download dependencies
+COPY go.mod go.sum ./
+RUN go mod download
 
-# Copy everything else and build
-COPY . ./
-RUN dotnet src/Backup publish -c Release -o out
+# Copy source code
+COPY . .
 
-# Build runtime image
-FROM microsoft/aspnetcore:2.0
+# Build the API and the Daemon
+# (The Windows Agent is compiled separately for Windows targets)
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /app/backupwebapi ./cmd/backupwebapi
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /app/backup-daemon ./cmd/backup-daemon
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /app/backup-cli ./cmd/backup-cli
+
+# Runtime image
+FROM alpine:latest
 WORKDIR /app
-COPY --from=build-env /app/out .
-ENTRYPOINT ["dotnet", "Backup.dll"]
+
+# Add required CA certificates for external TLS calls (like VMware/vCenter)
+RUN apk --no-cache add ca-certificates tzdata
+
+# Copy binaries
+COPY --from=build-env /app/backupwebapi /app/backupwebapi
+COPY --from=build-env /app/backup-daemon /app/backup-daemon
+COPY --from=build-env /app/backup-cli /app/backup-cli
+
+# Copy static web assets
+COPY wwwroot/ ./wwwroot/
+
+# By default, start the web api
+ENTRYPOINT ["/app/backupwebapi"]
