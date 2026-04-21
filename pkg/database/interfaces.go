@@ -79,6 +79,7 @@ type MetaStore interface {
 
 	// Calendar
 	AddCalendarEntry(entry *models.DBCalendarEntry) (uuid.UUID, error)
+	UpdateCalendarEntry(entry *models.DBCalendarEntry) error
 	GetCalendarEntry(entryID uuid.UUID) (*models.DBCalendarEntry, error)
 	GetCalendarEntries() ([]models.DBCalendarEntry, error)
 	GetServerCalendar(serverID uuid.UUID) ([]models.DBCalendarEntry, error)

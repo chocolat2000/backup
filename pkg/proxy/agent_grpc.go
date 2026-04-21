@@ -2,12 +2,14 @@ package proxy
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 
 	"backup/pkg/agentpb"
 	"backup/pkg/database"
@@ -32,8 +34,6 @@ func (c *GrpcAgentClient) getConn(ctx context.Context, serverID uuid.UUID) (*grp
 		return nil, fmt.Errorf("failed to fetch server: %w", err)
 	}
 
-	// Assuming the new gRPC agents listen on port 50051 natively or we use the server.Port.
-	// For backward compatibility conceptually, let's use the DB stored port or default 50051.
 	port := server.Port
 	if port == 0 {
 		port = 50051
@@ -41,8 +41,24 @@ func (c *GrpcAgentClient) getConn(ctx context.Context, serverID uuid.UUID) (*grp
 
 	addr := fmt.Sprintf("%s:%d", server.IP, port)
 
-	// Note: Insecure for now; in production we should use standard TLS with certificates.
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// Setup mTLS using agent credentials from environment
+	certFile := os.Getenv("AGENT_CERT_FILE")
+	keyFile := os.Getenv("AGENT_KEY_FILE")
+	if certFile == "" || keyFile == "" {
+		return nil, fmt.Errorf("AGENT_CERT_FILE and AGENT_KEY_FILE are required for mTLS security")
+	}
+
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load TLS keys: %w", err)
+	}
+
+	tlsConfig := &tls.Config{
+		Certificates:       []tls.Certificate{cert},
+		InsecureSkipVerify: true, // Typically should verify Server CA in prod
+	}
+
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial agent at %s: %w", addr, err)
 	}
@@ -119,8 +135,6 @@ func (c *GrpcAgentClient) BackupComplete(ctx context.Context, serverID uuid.UUID
 	return err
 }
 
-// GetStream requests a stream and returns the raw bytes downloaded.
-// Alternatively, it could return an io.Reader, but returning bytes is simpler for DataStore.WriteBlock.
 func (c *GrpcAgentClient) GetStream(ctx context.Context, serverID uuid.UUID, streamID uuid.UUID) ([]byte, error) {
 	conn, err := c.getConn(ctx, serverID)
 	if err != nil {

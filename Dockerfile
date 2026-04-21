@@ -1,5 +1,5 @@
 # Build environment for Go
-FROM golang:1.22-alpine AS build-env
+FROM golang:1.24-alpine AS build-env
 WORKDIR /app
 
 # Copy go mod and download dependencies

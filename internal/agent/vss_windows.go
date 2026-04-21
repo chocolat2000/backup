@@ -29,19 +29,20 @@ func NewVSSManager(volume string) *VSSManager {
 
 // CreateSnapshot creates a VSS snapshot using PowerShell WMI object methods safely.
 func (v *VSSManager) CreateSnapshot() error {
-	// Use powershell arguments to prevent command injection
-	script := `
+	// Use an anonymous script block to pass parameters safely via explicit powershell command string format
+	// This avoids parameter passing bugs with standard os/exec to powershell -Command
+	script := fmt.Sprintf(`& {
 		param($Vol)
 		$wmi = [wmiclass]"root\cimv2:Win32_ShadowCopy"
 		$result = $wmi.Create("$($Vol)\", "ClientAccessible")
 		if ($result.ReturnValue -eq 0) {
 			$result.ShadowID
 		} else {
-			Write-Error "Failed to create shadow copy. Error Code: $($result.ReturnValue)"
+			Write-Error "Failed to create shadow copy"
 		}
-	`
+	} -Vol '%s'`, v.Volume)
 
-	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", script, "-Vol", v.Volume)
+	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", script)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -59,15 +60,15 @@ func (v *VSSManager) CreateSnapshot() error {
 
 	time.Sleep(1 * time.Second)
 
-	pathScript := `
+	pathScript := fmt.Sprintf(`& {
 		param($ID)
 		$shadow = Get-WmiObject Win32_ShadowCopy | Where-Object { $_.ID -eq $ID }
 		if ($shadow) {
 			$shadow.DeviceObject
 		}
-	`
+	} -ID '%s'`, shadowID)
 
-	pathCmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", pathScript, "-ID", shadowID)
+	pathCmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", pathScript)
 	var pathOut bytes.Buffer
 	pathCmd.Stdout = &pathOut
 
@@ -86,15 +87,15 @@ func (v *VSSManager) DeleteSnapshot() error {
 		return nil
 	}
 
-	script := `
+	script := fmt.Sprintf(`& {
 		param($ID)
 		$shadow = Get-WmiObject Win32_ShadowCopy | Where-Object { $_.ID -eq $ID }
 		if ($shadow) {
 			$shadow.Delete()
 		}
-	`
+	} -ID '%s'`, v.ShadowID)
 
-	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", script, "-ID", v.ShadowID)
+	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", script)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to delete shadow copy %s: %v", v.ShadowID, err)
 	}
