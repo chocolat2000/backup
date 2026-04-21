@@ -29,9 +29,6 @@ const (
 // AgentServiceClient is the client API for AgentService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-//
-// The AgentService encompasses all previous services:
-// IGeneralService, IBackupService, IStreamService
 type AgentServiceClient interface {
 	// General Service
 	GetDrives(ctx context.Context, in *GetDrivesRequest, opts ...grpc.CallOption) (*GetDrivesResponse, error)
@@ -113,9 +110,6 @@ type AgentService_GetStreamClient = grpc.ServerStreamingClient[StreamChunk]
 // AgentServiceServer is the server API for AgentService service.
 // All implementations must embed UnimplementedAgentServiceServer
 // for forward compatibility.
-//
-// The AgentService encompasses all previous services:
-// IGeneralService, IBackupService, IStreamService
 type AgentServiceServer interface {
 	// General Service
 	GetDrives(context.Context, *GetDrivesRequest) (*GetDrivesResponse, error)

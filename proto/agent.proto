@@ -61,8 +61,8 @@ message StreamChunk {
   bytes data = 1;
 }
 
-// The AgentService encompasses all previous WCF services:
-// IGeneralService, IBackupService, IStreamService
+// The AgentService encompasses all previous services:
+
 service AgentService {
   // General Service
   rpc GetDrives(GetDrivesRequest) returns (GetDrivesResponse);
