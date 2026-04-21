@@ -18,8 +18,6 @@ import (
 type ServersHandler struct {
 	store       database.MetaStore
 	agentClient proxy.AgentClient
-
-	// For now, we mock the interaction logic until Vim25Proxy is fully migrated.
 }
 
 func NewServersHandler(store database.MetaStore, agentClient proxy.AgentClient) *ServersHandler {
@@ -51,6 +49,7 @@ func (h *ServersHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	refresh := r.URL.Query().Get("refresh") == "true"
+	var proxyClient proxy.VMwareProxy
 
 	serverType, err := h.store.GetServerType(id)
 	if err != nil {
@@ -68,6 +67,9 @@ func (h *ServersHandler) Get(w http.ResponseWriter, r *http.Request) {
 		server, err = h.store.GetWindowsServer(id, refresh)
 	case models.ServerTypeVMware:
 		server, err = h.store.GetVMWareServer(id, refresh)
+		if err == nil && server != nil && refresh {
+			proxyClient, err = proxy.NewGovmomiProxy(server.IP)
+		}
 	default:
 		http.Error(w, "Unknown server type", http.StatusInternalServerError)
 		return
@@ -78,10 +80,17 @@ func (h *ServersHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if refresh && server.Type == models.ServerTypeVMware {
-		// Mock Vim25Proxy behavior since it's not migrated yet.
-		// server.VMwareVMs = ...
-		// h.store.UpdateServer(server)
+	if refresh && server.Type == models.ServerTypeVMware && proxyClient != nil {
+		if err := proxyClient.Login(r.Context(), server.Username, server.Password); err == nil {
+			defer proxyClient.Logout(r.Context())
+
+			vms, err := proxyClient.GetVMs(r.Context())
+			if err == nil {
+				server.VMwareVMs = vms
+				// Save back to DB
+				h.store.UpdateServer(server)
+			}
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -108,15 +117,30 @@ func (h *ServersHandler) GetArbo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// This implies pulling the unencrypted credentials from the store.
-	_, err = h.store.GetVMWareServer(id, true)
+	server, err := h.store.GetVMWareServer(id, true)
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	// Mock arborescence retrieval
+	proxyClient, err := proxy.NewGovmomiProxy(server.IP)
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
 	arbo := proxy.VMwareArbo{}
+
+	if err := proxyClient.Login(r.Context(), server.Username, server.Password); err == nil {
+		defer proxyClient.Logout(r.Context())
+
+		if folders, err := proxyClient.GetFolders(r.Context()); err == nil {
+			arbo.Folders = folders
+		}
+		if pools, err := proxyClient.GetPools(r.Context()); err == nil {
+			arbo.Pools = pools
+		}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(arbo)
@@ -218,7 +242,6 @@ func (h *ServersHandler) AddVMwareServer(w http.ResponseWriter, r *http.Request)
 	client := &http.Client{Transport: customTransport}
 	resp, err := client.Get(fmt.Sprintf("https://%s", server.IP))
 	if err != nil {
-
 		http.Error(w, "Failed to connect to VMware server for thumbprint", http.StatusBadGateway)
 		return
 	}
@@ -227,8 +250,8 @@ func (h *ServersHandler) AddVMwareServer(w http.ResponseWriter, r *http.Request)
 	if resp.TLS != nil && len(resp.TLS.PeerCertificates) > 0 {
 		cert := resp.TLS.PeerCertificates[0]
 		// Convert SHA1 hash bytes to XX:XX:XX formatted string
-		var thumbprintParts []string
 		hash := sha1.Sum(cert.Raw)
+		var thumbprintParts []string
 		for _, b := range hash {
 			thumbprintParts = append(thumbprintParts, fmt.Sprintf("%02X", b))
 		}
