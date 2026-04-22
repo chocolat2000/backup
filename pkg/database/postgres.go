@@ -97,7 +97,7 @@ func (s *PostgresStore) AddHash(hash uuid.UUID, block uuid.UUID) error {
 		INSERT INTO hashes (hash, block, "references")
 		VALUES (?, ?, 1)
 		ON CONFLICT (hash, block)
-		DO UPDATE SET "references" = hashes.references + 1
+		DO UPDATE SET "references" = hashes."references" + 1
 	`, hash, block).Error
 }
 
@@ -432,4 +432,8 @@ func (s *PostgresStore) GetNextCalendarEntries() ([]models.DBCalendarEntry, erro
 	var entries []models.DBCalendarEntry
 	err := s.db.Where("enabled = ? AND nextrun <= ?", true, now).Find(&entries).Error
 	return entries, err
+}
+
+func (s *PostgresStore) UpdateCalendarEntry(entry *models.DBCalendarEntry) error {
+	return s.db.Save(entry).Error
 }

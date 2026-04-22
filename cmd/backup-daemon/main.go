@@ -97,7 +97,7 @@ func processCalendarEntries(ctx context.Context, store database.MetaStore) {
 
 		// Update next run inside DB
 		e.UpdateNextRun()
-		if _, err := store.AddCalendarEntry(&e); err != nil {
+		if _, err := store.UpdateCalendarEntry(&e); err != nil {
 			log.Printf("Failed to update next run for entry %s: %v", e.ID, err)
 			continue
 		}

@@ -5,9 +5,11 @@ package main
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"log"
 	"net"
 	"os"
+	"io/ioutil"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -29,8 +31,9 @@ func main() {
 
 	certFile := os.Getenv("AGENT_CERT_FILE")
 	keyFile := os.Getenv("AGENT_KEY_FILE")
-	if certFile == "" || keyFile == "" {
-		log.Fatalf("AGENT_CERT_FILE and AGENT_KEY_FILE environment variables are required for secure mTLS")
+	caFile := os.Getenv("AGENT_CA_FILE")
+	if certFile == "" || keyFile == "" || caFile == "" {
+		log.Fatalf("AGENT_CERT_FILE, AGENT_KEY_FILE, and AGENT_CA_FILE are required for secure mTLS")
 	}
 
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
@@ -38,20 +41,28 @@ func main() {
 		log.Fatalf("failed to load TLS keys: %v", err)
 	}
 
-	// Setup TLS Config requiring client certs (mTLS)
+	caCert, err := ioutil.ReadFile(caFile)
+	if err != nil {
+		log.Fatalf("failed to read CA certificate: %v", err)
+	}
+	caCertPool := x509.NewCertPool()
+	if !caCertPool.AppendCertsFromPEM(caCert) {
+		log.Fatalf("failed to parse CA certificate")
+	}
+
+	// Setup strictly authenticated TLS Config requiring signed client certs (mTLS)
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{cert},
-		ClientAuth:   tls.RequireAnyClientCert, // Authenticate client explicitly
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientCAs:    caCertPool,
 	}
 
 	opts := []grpc.ServerOption{
 		grpc.Creds(credentials.NewTLS(tlsConfig)),
 	}
 
-	// Create new gRPC Server securely
 	grpcServer := grpc.NewServer(opts...)
 
-	// Initialize and Register the Agent implementation
 	agentServer := agent.NewAgentServer()
 	agentpb.RegisterAgentServiceServer(grpcServer, agentServer)
 

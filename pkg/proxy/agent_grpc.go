@@ -2,38 +2,37 @@ package proxy
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 
 	"backup/pkg/agentpb"
 	"backup/pkg/database"
 )
 
-// GrpcAgentClient implements the AgentClient interface communicating via gRPC.
 type GrpcAgentClient struct {
 	metaDB database.MetaStore
 }
 
-// NewGrpcAgentClient initializes a new GrpcAgentClient.
 func NewGrpcAgentClient(metaDB database.MetaStore) *GrpcAgentClient {
 	return &GrpcAgentClient{
 		metaDB: metaDB,
 	}
 }
 
-// getConn resolves the server IP from the metaDB and establishes a gRPC connection.
 func (c *GrpcAgentClient) getConn(ctx context.Context, serverID uuid.UUID) (*grpc.ClientConn, error) {
 	server, err := c.metaDB.GetWindowsServer(serverID, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch server: %w", err)
 	}
 
-	// Assuming the new gRPC agents listen on port 50051 natively or we use the server.Port.
-	// For backward compatibility conceptually, let's use the DB stored port or default 50051.
 	port := server.Port
 	if port == 0 {
 		port = 50051
@@ -41,8 +40,33 @@ func (c *GrpcAgentClient) getConn(ctx context.Context, serverID uuid.UUID) (*grp
 
 	addr := fmt.Sprintf("%s:%d", server.IP, port)
 
-	// Note: Insecure for now; in production we should use standard TLS with certificates.
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	certFile := os.Getenv("AGENT_CERT_FILE")
+	keyFile := os.Getenv("AGENT_KEY_FILE")
+	caFile := os.Getenv("AGENT_CA_FILE")
+	if certFile == "" || keyFile == "" || caFile == "" {
+		return nil, fmt.Errorf("AGENT_CERT_FILE, AGENT_KEY_FILE, and AGENT_CA_FILE are required for mTLS security")
+	}
+
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load TLS keys: %w", err)
+	}
+
+	caCert, err := ioutil.ReadFile(caFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+	}
+	caCertPool := x509.NewCertPool()
+	if !caCertPool.AppendCertsFromPEM(caCert) {
+		return nil, fmt.Errorf("failed to parse CA certificate")
+	}
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      caCertPool,
+	}
+
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial agent at %s: %w", addr, err)
 	}
@@ -62,7 +86,6 @@ func (c *GrpcAgentClient) GetDrives(ctx context.Context, serverID uuid.UUID) ([]
 	if err != nil {
 		return nil, err
 	}
-
 	return resp.Drives, nil
 }
 
@@ -100,7 +123,6 @@ func (c *GrpcAgentClient) Backup(ctx context.Context, serverID uuid.UUID, items 
 		Items:    items,
 		BackupId: backupID.String(),
 	})
-
 	return err
 }
 
@@ -115,12 +137,9 @@ func (c *GrpcAgentClient) BackupComplete(ctx context.Context, serverID uuid.UUID
 	_, err = client.BackupComplete(ctx, &agentpb.BackupCompleteRequest{
 		BackupId: backupID.String(),
 	})
-
 	return err
 }
 
-// GetStream requests a stream and returns the raw bytes downloaded.
-// Alternatively, it could return an io.Reader, but returning bytes is simpler for DataStore.WriteBlock.
 func (c *GrpcAgentClient) GetStream(ctx context.Context, serverID uuid.UUID, streamID uuid.UUID) ([]byte, error) {
 	conn, err := c.getConn(ctx, serverID)
 	if err != nil {
