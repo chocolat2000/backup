@@ -9,17 +9,16 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+	"encoding/base64"
 )
 
 // VSSManager provides a wrapper around Windows Volume Shadow Copy Service.
-// VSS workflow without CGO, PowerShell WMI/CIM calls are highly effective.
 type VSSManager struct {
 	ShadowID     string
 	Volume       string
 	SnapshotPath string
 }
 
-// NewVSSManager initializes a VSS snapshot manager for a specific drive (e.g., "C:\").
 func NewVSSManager(volume string) *VSSManager {
 	vol := strings.TrimSuffix(volume, "\\")
 	return &VSSManager{
@@ -27,12 +26,13 @@ func NewVSSManager(volume string) *VSSManager {
 	}
 }
 
-// CreateSnapshot creates a VSS snapshot using PowerShell WMI object methods safely.
 func (v *VSSManager) CreateSnapshot() error {
-	// Use an anonymous script block to pass parameters safely via explicit powershell command string format
-	// This avoids parameter passing bugs with standard os/exec to powershell -Command
+	// Encode the volume string in Base64 to safely pass it to PowerShell without escaping issues (RCE fix)
+	encodedVol := base64.StdEncoding.EncodeToString([]byte(v.Volume))
+
 	script := fmt.Sprintf(`& {
-		param($Vol)
+		$decodedVolBytes = [System.Convert]::FromBase64String('%s')
+		$Vol = [System.Text.Encoding]::UTF8.GetString($decodedVolBytes)
 		$wmi = [wmiclass]"root\cimv2:Win32_ShadowCopy"
 		$result = $wmi.Create("$($Vol)\", "ClientAccessible")
 		if ($result.ReturnValue -eq 0) {
@@ -40,7 +40,7 @@ func (v *VSSManager) CreateSnapshot() error {
 		} else {
 			Write-Error "Failed to create shadow copy"
 		}
-	} -Vol '%s'`, v.Volume)
+	}`, encodedVol)
 
 	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", script)
 	var out bytes.Buffer
@@ -57,16 +57,17 @@ func (v *VSSManager) CreateSnapshot() error {
 		return fmt.Errorf("failed to retrieve Shadow ID")
 	}
 	v.ShadowID = shadowID
-
 	time.Sleep(1 * time.Second)
 
+	encodedID := base64.StdEncoding.EncodeToString([]byte(shadowID))
 	pathScript := fmt.Sprintf(`& {
-		param($ID)
+		$decodedIDBytes = [System.Convert]::FromBase64String('%s')
+		$ID = [System.Text.Encoding]::UTF8.GetString($decodedIDBytes)
 		$shadow = Get-WmiObject Win32_ShadowCopy | Where-Object { $_.ID -eq $ID }
 		if ($shadow) {
 			$shadow.DeviceObject
 		}
-	} -ID '%s'`, shadowID)
+	}`, encodedID)
 
 	pathCmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", pathScript)
 	var pathOut bytes.Buffer
@@ -81,19 +82,20 @@ func (v *VSSManager) CreateSnapshot() error {
 	return nil
 }
 
-// DeleteSnapshot deletes the shadow copy.
 func (v *VSSManager) DeleteSnapshot() error {
 	if v.ShadowID == "" {
 		return nil
 	}
 
+	encodedID := base64.StdEncoding.EncodeToString([]byte(v.ShadowID))
 	script := fmt.Sprintf(`& {
-		param($ID)
+		$decodedIDBytes = [System.Convert]::FromBase64String('%s')
+		$ID = [System.Text.Encoding]::UTF8.GetString($decodedIDBytes)
 		$shadow = Get-WmiObject Win32_ShadowCopy | Where-Object { $_.ID -eq $ID }
 		if ($shadow) {
 			$shadow.Delete()
 		}
-	} -ID '%s'`, v.ShadowID)
+	}`, encodedID)
 
 	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", script)
 	if err := cmd.Run(); err != nil {
@@ -105,21 +107,16 @@ func (v *VSSManager) DeleteSnapshot() error {
 	return nil
 }
 
-// TranslatePath converts a regular file path (e.g., C:\Users\File.txt) to the
-// equivalent path inside the VSS snapshot for safe reading.
 func (v *VSSManager) TranslatePath(originalPath string) (string, error) {
 	if v.SnapshotPath == "" {
 		return "", fmt.Errorf("no active snapshot")
 	}
-
 	if !strings.HasPrefix(strings.ToUpper(originalPath), strings.ToUpper(v.Volume)) {
 		return "", fmt.Errorf("path %s is not on volume %s", originalPath, v.Volume)
 	}
-
 	relativePath := strings.TrimPrefix(originalPath, v.Volume)
 	if !strings.HasPrefix(relativePath, "\\") {
 		relativePath = "\\" + relativePath
 	}
-
 	return v.SnapshotPath + relativePath, nil
 }

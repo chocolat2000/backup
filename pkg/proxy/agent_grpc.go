@@ -3,8 +3,10 @@ package proxy
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 
 	"github.com/google/uuid"
@@ -15,19 +17,16 @@ import (
 	"backup/pkg/database"
 )
 
-// GrpcAgentClient implements the AgentClient interface communicating via gRPC.
 type GrpcAgentClient struct {
 	metaDB database.MetaStore
 }
 
-// NewGrpcAgentClient initializes a new GrpcAgentClient.
 func NewGrpcAgentClient(metaDB database.MetaStore) *GrpcAgentClient {
 	return &GrpcAgentClient{
 		metaDB: metaDB,
 	}
 }
 
-// getConn resolves the server IP from the metaDB and establishes a gRPC connection.
 func (c *GrpcAgentClient) getConn(ctx context.Context, serverID uuid.UUID) (*grpc.ClientConn, error) {
 	server, err := c.metaDB.GetWindowsServer(serverID, false)
 	if err != nil {
@@ -41,11 +40,11 @@ func (c *GrpcAgentClient) getConn(ctx context.Context, serverID uuid.UUID) (*grp
 
 	addr := fmt.Sprintf("%s:%d", server.IP, port)
 
-	// Setup mTLS using agent credentials from environment
 	certFile := os.Getenv("AGENT_CERT_FILE")
 	keyFile := os.Getenv("AGENT_KEY_FILE")
-	if certFile == "" || keyFile == "" {
-		return nil, fmt.Errorf("AGENT_CERT_FILE and AGENT_KEY_FILE are required for mTLS security")
+	caFile := os.Getenv("AGENT_CA_FILE")
+	if certFile == "" || keyFile == "" || caFile == "" {
+		return nil, fmt.Errorf("AGENT_CERT_FILE, AGENT_KEY_FILE, and AGENT_CA_FILE are required for mTLS security")
 	}
 
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
@@ -53,9 +52,18 @@ func (c *GrpcAgentClient) getConn(ctx context.Context, serverID uuid.UUID) (*grp
 		return nil, fmt.Errorf("failed to load TLS keys: %w", err)
 	}
 
+	caCert, err := ioutil.ReadFile(caFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+	}
+	caCertPool := x509.NewCertPool()
+	if !caCertPool.AppendCertsFromPEM(caCert) {
+		return nil, fmt.Errorf("failed to parse CA certificate")
+	}
+
 	tlsConfig := &tls.Config{
-		Certificates:       []tls.Certificate{cert},
-		InsecureSkipVerify: true, // Typically should verify Server CA in prod
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      caCertPool,
 	}
 
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
@@ -78,7 +86,6 @@ func (c *GrpcAgentClient) GetDrives(ctx context.Context, serverID uuid.UUID) ([]
 	if err != nil {
 		return nil, err
 	}
-
 	return resp.Drives, nil
 }
 
@@ -116,7 +123,6 @@ func (c *GrpcAgentClient) Backup(ctx context.Context, serverID uuid.UUID, items 
 		Items:    items,
 		BackupId: backupID.String(),
 	})
-
 	return err
 }
 
@@ -131,7 +137,6 @@ func (c *GrpcAgentClient) BackupComplete(ctx context.Context, serverID uuid.UUID
 	_, err = client.BackupComplete(ctx, &agentpb.BackupCompleteRequest{
 		BackupId: backupID.String(),
 	})
-
 	return err
 }
 
