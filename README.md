@@ -1,6 +1,6 @@
 # Backup System
 
-This repository contains a modern, pure Golang enterprise backup system. It replaces a legacy C# architecture, offering high-performance, cross-platform capabilities, and a simplified deployment model.
+This repository contains a modern, pure Golang enterprise backup system. It offers high-performance, cross-platform capabilities, and a simplified deployment model.
 
 ## Architecture
 
@@ -16,7 +16,7 @@ The system is composed of four primary Golang executables:
 - **Payloads**: Raw backup binary blocks are stored directly on the central **File System**, utilizing a secure, sharded directory structure based on block UUIDs.
 
 ### VMware Integration
-Interactions with VMware vCenter/ESXi are performed natively via the official `github.com/vmware/govmomi` library. This allows the system to snapshot VMs and securely download `.vmdk` files directly over HTTP using the vSphere Datastore NFC protocols, completely eliminating the need for complex C/C++ VDDK binaries.
+Interactions with VMware vCenter/ESXi are performed natively via the official `github.com/vmware/govmomi` library. This allows the system to snapshot VMs and securely download `.vmdk` files directly over HTTP using the vSphere Datastore NFC protocols.
 
 ---
 
