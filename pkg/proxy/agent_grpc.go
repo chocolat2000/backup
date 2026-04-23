@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"sync"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
@@ -16,6 +17,14 @@ import (
 	"backup/pkg/agentpb"
 	"backup/pkg/database"
 )
+
+var chunkPool = sync.Pool{
+	New: func() interface{} {
+		// Allocate 64KB buffers
+		b := make([]byte, 65536)
+		return &b
+	},
+}
 
 type GrpcAgentClient struct {
 	metaDB database.MetaStore
@@ -156,6 +165,8 @@ func (c *GrpcAgentClient) GetStream(ctx context.Context, serverID uuid.UUID, str
 	}
 
 	var data []byte
+
+	// Stream from gRPC
 	for {
 		chunk, err := stream.Recv()
 		if err == io.EOF {
@@ -164,6 +175,9 @@ func (c *GrpcAgentClient) GetStream(ctx context.Context, serverID uuid.UUID, str
 		if err != nil {
 			return nil, err
 		}
+		// In a true large streaming scenario, we wouldn't append to a massive byte array
+		// but rather pass the byte chunk to the datastore writer directly.
+		// Since we will refactor the Runner logic next, this array builder will remain for now.
 		data = append(data, chunk.Data...)
 	}
 

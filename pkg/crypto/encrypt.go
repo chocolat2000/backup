@@ -1,7 +1,6 @@
 package crypto
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -14,7 +13,7 @@ import (
 
 const encryptSplit = "$"
 
-// Encryptor represents an object that can encrypt and decrypt messages using AES-CBC.
+// Encryptor represents an object that can encrypt and decrypt messages using AES-GCM.
 type Encryptor struct {
 	key []byte
 }
@@ -31,39 +30,39 @@ func NewEncryptor(key []byte) *Encryptor {
 	}
 }
 
-// Encrypt encrypts a plaintext message using AES-CBC with PKCS7 padding.
+// Encrypt encrypts a plaintext message using AES-GCM (Authenticated Encryption).
 func (e *Encryptor) Encrypt(message string) (string, error) {
 	block, err := aes.NewCipher(e.key)
 	if err != nil {
 		return "", err
 	}
 
-	// Generate random IV
-	iv := make([]byte, aes.BlockSize)
-	if _, err := rand.Read(iv); err != nil {
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+
+	nonce := make([]byte, aesgcm.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
 		return "", err
 	}
 
 	plaintext := []byte(message)
-	plaintext = pkcs7Pad(plaintext, aes.BlockSize)
+	ciphertext := aesgcm.Seal(nil, nonce, plaintext, nil)
 
-	ciphertext := make([]byte, len(plaintext))
-	mode := cipher.NewCBCEncrypter(block, iv)
-	mode.CryptBlocks(ciphertext, plaintext)
-
-	return fmt.Sprintf("%s%s%s", base64.StdEncoding.EncodeToString(iv), encryptSplit, base64.StdEncoding.EncodeToString(ciphertext)), nil
+	return fmt.Sprintf("%s%s%s", base64.StdEncoding.EncodeToString(nonce), encryptSplit, base64.StdEncoding.EncodeToString(ciphertext)), nil
 }
 
-// Decrypt decrypts a ciphertext message that was encrypted using AES-CBC with PKCS7 padding.
+// Decrypt decrypts a ciphertext message that was encrypted using AES-GCM.
 func (e *Encryptor) Decrypt(message string) (string, error) {
 	parts := strings.Split(message, encryptSplit)
 	if len(parts) != 2 {
 		return "", errors.New("encoded message format not recognised")
 	}
 
-	iv, err := base64.StdEncoding.DecodeString(parts[0])
+	nonce, err := base64.StdEncoding.DecodeString(parts[0])
 	if err != nil {
-		return "", errors.New("invalid IV encoding")
+		return "", errors.New("invalid nonce encoding")
 	}
 
 	ciphertext, err := base64.StdEncoding.DecodeString(parts[1])
@@ -76,47 +75,15 @@ func (e *Encryptor) Decrypt(message string) (string, error) {
 		return "", err
 	}
 
-	if len(ciphertext)%aes.BlockSize != 0 {
-		return "", errors.New("ciphertext is not a multiple of the block size")
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
 	}
 
-	plaintext := make([]byte, len(ciphertext))
-	mode := cipher.NewCBCDecrypter(block, iv)
-	mode.CryptBlocks(plaintext, ciphertext)
-
-	plaintext, err = pkcs7Unpad(plaintext, aes.BlockSize)
+	plaintext, err := aesgcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		return "", err
 	}
 
 	return string(plaintext), nil
-}
-
-// pkcs7Pad appends padding.
-func pkcs7Pad(data []byte, blockSize int) []byte {
-	padding := blockSize - len(data)%blockSize
-	padText := bytes.Repeat([]byte{byte(padding)}, padding)
-	return append(data, padText...)
-}
-
-// pkcs7Unpad removes padding.
-func pkcs7Unpad(data []byte, blockSize int) ([]byte, error) {
-	length := len(data)
-	if length == 0 {
-		return nil, errors.New("pkcs7: data is empty")
-	}
-	if length%blockSize != 0 {
-		return nil, errors.New("pkcs7: data is not block-aligned")
-	}
-	padLen := int(data[length-1])
-	if padLen == 0 || padLen > blockSize {
-		return nil, errors.New("pkcs7: invalid padding length")
-	}
-	// Check padding
-	for i := 0; i < padLen; i++ {
-		if data[length-1-i] != byte(padLen) {
-			return nil, errors.New("pkcs7: invalid padding")
-		}
-	}
-	return data[:length-padLen], nil
 }

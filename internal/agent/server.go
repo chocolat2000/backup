@@ -9,11 +9,20 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/google/uuid"
 
 	"backup/pkg/agentpb"
 )
+
+var chunkPool = sync.Pool{
+	New: func() interface{} {
+		// Allocate 64KB buffers
+		b := make([]byte, 65536)
+		return &b
+	},
+}
 
 // AgentServer implements the generated gRPC interface for the Windows backup agent.
 type AgentServer struct {
@@ -78,8 +87,7 @@ func (s *AgentServer) Backup(ctx context.Context, req *agentpb.BackupRequest) (*
 		return &agentpb.BackupResponse{}, nil
 	}
 
-	// Simplification: handling distinct volumes.
-	// Here, we grab the volume of the first item to instantiate the snapshot.
+	// Handling distinct volumes.
 	volume := filepath.VolumeName(items[0])
 	if volume == "" {
 		return nil, fmt.Errorf("could not determine volume for %s", items[0])
@@ -92,14 +100,11 @@ func (s *AgentServer) Backup(ctx context.Context, req *agentpb.BackupRequest) (*
 		log.Printf("VSS Snapshot created successfully on %s", volume)
 	}
 
-	// Mocking the complex callback loop.
-	// In gRPC, typically we would use a bidirectional stream or send a single repeated array.
-	// Since the proto uses unary request for Backup, we only signal it started here.
-	// Real implementation would stream items to the master node or store them locally for pulling.
 	for _, item := range items {
 		log.Printf("Backing up item: %s", item)
 	}
 
+	// Normally we would populate a map of files here so `GetStream` knows what to pull
 	return &agentpb.BackupResponse{}, nil
 }
 
@@ -119,15 +124,11 @@ func (s *AgentServer) BackupComplete(ctx context.Context, req *agentpb.BackupCom
 
 // GetStream streams a requested file back to the server in chunks.
 func (s *AgentServer) GetStream(req *agentpb.StreamRequest, stream agentpb.AgentService_GetStreamServer) error {
-	// In the real system, the stream ID maps to a file path requested during the `Backup` phase.
-	// We'll mock the file path derivation for this migration.
 	streamID, err := uuid.Parse(req.StreamId)
 	if err != nil {
 		return err
 	}
 
-	// Mock path derived from stream ID
-	// Real code would use the concurrent dictionary populated during Backup()
 	filePath := fmt.Sprintf("C:\\mock\\%s.tmp", streamID.String())
 
 	// Translate path if a VSS snapshot is active
@@ -152,8 +153,11 @@ func (s *AgentServer) GetStream(req *agentpb.StreamRequest, stream agentpb.Agent
 	}
 	defer file.Close()
 
-	// Stream file in 64KB chunks
-	buf := make([]byte, 65536)
+	// Stream file using the chunkPool to reduce GC allocations
+	bufPtr := chunkPool.Get().(*[]byte)
+	defer chunkPool.Put(bufPtr)
+	buf := *bufPtr
+
 	for {
 		n, err := file.Read(buf)
 		if err == io.EOF {

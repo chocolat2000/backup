@@ -15,6 +15,7 @@ import (
 
 	"backup/pkg/database"
 	"backup/pkg/models"
+	"backup/pkg/proxy"
 	"backup/pkg/runners"
 )
 
@@ -41,7 +42,15 @@ func main() {
 		log.Fatalf("failed to initialize postgres store: %v", err)
 	}
 
-	intervalSeconds := 2 // default
+	baseLocation := os.Getenv("DATASTORE_PATH")
+	if baseLocation == "" {
+		baseLocation = "./backup-data"
+	}
+	dataStore := database.NewFileSystemStore(baseLocation)
+
+	agentClient := proxy.NewGrpcAgentClient(store)
+
+	intervalSeconds := 2
 	if intervalStr := os.Getenv("DAEMON_TICKER_INTERVAL"); intervalStr != "" {
 		if parsed, err := strconv.Atoi(intervalStr); err == nil && parsed > 0 {
 			intervalSeconds = parsed
@@ -55,20 +64,19 @@ func main() {
 
 	log.Printf("Starting backup daemon with interval %ds...", intervalSeconds)
 
-	go runDaemon(ctx, store, time.Duration(intervalSeconds)*time.Second)
+	go runDaemon(ctx, store, agentClient, dataStore, time.Duration(intervalSeconds)*time.Second)
 
-	// Wait for interrupt signal to gracefully shutdown the daemon
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	log.Println("Shutting down daemon...")
 	cancel()
-	time.Sleep(1 * time.Second) // allow goroutines to exit
+	time.Sleep(1 * time.Second)
 	log.Println("Daemon exited.")
 }
 
-func runDaemon(ctx context.Context, store database.MetaStore, interval time.Duration) {
+func runDaemon(ctx context.Context, store database.MetaStore, agentClient proxy.AgentClient, dataStore database.DataStore, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -77,12 +85,12 @@ func runDaemon(ctx context.Context, store database.MetaStore, interval time.Dura
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			processCalendarEntries(ctx, store)
+			processCalendarEntries(ctx, store, agentClient, dataStore)
 		}
 	}
 }
 
-func processCalendarEntries(ctx context.Context, store database.MetaStore) {
+func processCalendarEntries(ctx context.Context, store database.MetaStore, agentClient proxy.AgentClient, dataStore database.DataStore) {
 	entries, err := store.GetNextCalendarEntries()
 	if err != nil {
 		log.Printf("Database error fetching calendar entries: %v", err)
@@ -90,19 +98,16 @@ func processCalendarEntries(ctx context.Context, store database.MetaStore) {
 	}
 
 	for _, entry := range entries {
-		// Capture entry for goroutine
 		e := entry
 
 		log.Printf("\n-------------------\n\n%v - %s", e.NextRun, e.ID)
 
-		// Update next run inside DB
 		e.UpdateNextRun()
-		if _, err := store.UpdateCalendarEntry(&e); err != nil {
+		if err := store.UpdateCalendarEntry(&e); err != nil {
 			log.Printf("Failed to update next run for entry %s: %v", e.ID, err)
 			continue
 		}
 
-		// Run backup job in a separate goroutine
 		go func(calEntry models.DBCalendarEntry) {
 			serverType, err := store.GetServerType(calEntry.Server)
 			if err != nil {
@@ -112,7 +117,7 @@ func processCalendarEntries(ctx context.Context, store database.MetaStore) {
 
 			switch serverType {
 			case models.ServerTypeWindows:
-				agentRunner := runners.NewAgentBackup(store)
+				agentRunner := runners.NewAgentBackup(store, agentClient, dataStore)
 				if err := agentRunner.Run(ctx, calEntry.Server, calEntry.Items); err != nil {
 					log.Printf("AgentBackup failed for entry %s: %v", calEntry.ID, err)
 				}
